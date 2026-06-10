@@ -341,7 +341,7 @@
     refreshBadges();
     return card;
   }
-  function makeGroup(hand) {
+  function makeGroup(hand, afterEl) {
     const g = document.createElement("div");
     g.className = "hand-group";
     const badge = document.createElement("div");
@@ -349,7 +349,8 @@
     g.appendChild(badge);
     hand.groupEl = g;
     hand.badge = badge;
-    playerHand.appendChild(g);
+    if (afterEl && afterEl.nextSibling) playerHand.insertBefore(g, afterEl.nextSibling);
+    else playerHand.appendChild(g);
   }
   function refreshBadges() {
     for (const h of hands) {
@@ -384,8 +385,9 @@
     balanceEl.classList.add("bump");
   }
   function canSplit() {
-    return state === "play" && hands.length === 1 && hands[0].cards.length === 2 &&
-      hands[0].cards[0].v === hands[0].cards[1].v && save.balance >= hands[0].bet;
+    const h = hands[active];
+    return state === "play" && h && hands.length < 4 && h.cards.length === 2 &&
+      h.cards[0].v === h.cards[1].v && save.balance >= h.bet;
   }
   function render() {
     balanceVal.textContent = save.balance.toLocaleString("en-US");
@@ -446,25 +448,24 @@
   async function split() {
     if (!canSplit()) return;
     ensureAudio(); sfx.chip();
-    const h0 = hands[0];
+    const h0 = hands[active];
     save.balance -= h0.bet; persist();
     const moved = h0.cards.pop();
     const h1 = { cards: [moved], bet: h0.bet, done: false };
-    hands.push(h1);
-    // move the card's element into a new group
+    hands.splice(active + 1, 0, h1);
+    // move the card's element into a new group right after this hand
     const cardEls = h0.groupEl.querySelectorAll(".card");
     const movedEl = cardEls[cardEls.length - 1];
-    makeGroup(h1);
+    makeGroup(h1, h0.groupEl);
     h1.groupEl.insertBefore(movedEl, h1.badge);
     render();
     refreshBadges();
     await sleep(200);
     await dealTo(h0.cards, h0.groupEl, false);
     await dealTo(h1.cards, h1.groupEl, false);
-    active = 0;
     refreshBadges();
     render();
-    if (value(hands[0].cards) === 21) { hands[0].done = true; await advance(); }
+    if (value(hands[active].cards) === 21) { hands[active].done = true; await advance(); }
   }
 
   async function hit() {
