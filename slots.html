@@ -472,22 +472,22 @@
   const MUSIC_SPB = 0.21;
   let mStep = 0, mNext = 0, mTimer = null;
   function mNote(f, dur, type, vol, when) {
-    const t = actx.currentTime + when;
-    const o = actx.createOscillator(), g = actx.createGain();
+    const t = audioCtx.currentTime + when;
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type = type; o.frequency.value = f;
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(actx.destination);
+    o.connect(g).connect(audioCtx.destination);
     o.start(t); o.stop(t + dur + 0.02);
   }
   function startMusic() {
     ensureAudio();
-    if (mTimer || !actx) return;
-    mStep = 0; mNext = actx.currentTime + 0.1;
+    if (mTimer || !audioCtx) return;
+    mStep = 0; mNext = audioCtx.currentTime + 0.1;
     mTimer = setInterval(() => {
-      if (!actx) return;
-      while (mNext < actx.currentTime + 0.35) {
-        const w = Math.max(0, mNext - actx.currentTime);
+      if (!audioCtx) return;
+      while (mNext < audioCtx.currentTime + 0.35) {
+        const w = Math.max(0, mNext - audioCtx.currentTime);
         const b = MUSIC_BASS[mStep % MUSIC_BASS.length];
         const l = MUSIC_LEAD[mStep % MUSIC_LEAD.length];
         if (b) mNote(b, 0.2, "triangle", 0.032, w);

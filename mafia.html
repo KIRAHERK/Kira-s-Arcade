@@ -153,6 +153,142 @@
   "use strict";
 
   /* =====================================================
+     SOUND DESIGN — dark ambience + phase stingers
+     ===================================================== */
+  let actx = null, master = null, droneGain = null, ambientOn = false;
+  function ensureAudio() {
+    if (!actx) {
+      try {
+        actx = new (window.AudioContext || window.webkitAudioContext)();
+        master = actx.createGain();
+        master.gain.value = 0.55;
+        master.connect(actx.destination);
+      } catch (e) {}
+    }
+    if (actx && actx.state === "suspended") actx.resume();
+  }
+  function tone(f1, f2, dur, type, vol, when = 0, attack = 0.005) {
+    if (!actx) return;
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f1, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(f2, 1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function bell(freq, dur, vol, when = 0) {   // tolling bell: partials with long decay
+    if (!actx) return;
+    for (const [mult, v] of [[1, 1], [2.7, 0.4], [5.4, 0.15]]) {
+      tone(freq * mult, freq * mult * 0.985, dur, "sine", vol * v, when, 0.002);
+    }
+  }
+  function thump(when = 0, vol = 0.12) {       // heartbeat / gavel body
+    if (!actx) return;
+    tone(85, 40, 0.16, "sine", vol, when, 0.002);
+  }
+  function startAmbient() {
+    ensureAudio();
+    if (ambientOn || !actx) return;
+    ambientOn = true;
+    // breathing low drone: two detuned oscillators through a dark lowpass
+    droneGain = actx.createGain();
+    droneGain.gain.value = 0.035;
+    const lp = actx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 200; lp.Q.value = 2;
+    const o1 = actx.createOscillator(); o1.type = "sawtooth"; o1.frequency.value = 55;
+    const o2 = actx.createOscillator(); o2.type = "sawtooth"; o2.frequency.value = 55.6;
+    const o3 = actx.createOscillator(); o3.type = "sine"; o3.frequency.value = 110.2;
+    const og = actx.createGain(); og.gain.value = 0.5;
+    o1.connect(og); o2.connect(og); o3.connect(og);
+    og.connect(lp).connect ? og.connect(lp) : null;
+    og.connect(lp); lp.connect(droneGain); droneGain.connect(master);
+    o1.start(); o2.start(); o3.start();
+    // slow breathing LFO on the drone
+    const lfo = actx.createOscillator(); lfo.frequency.value = 0.06;
+    const lfoG = actx.createGain(); lfoG.gain.value = 0.018;
+    lfo.connect(lfoG); lfoG.connect(droneGain.gain);
+    lfo.start();
+    // sparse eerie whispers: a lonely high note every 7-15s
+    setInterval(() => {
+      if (!actx || actx.state !== "running") return;
+      if (Math.random() < 0.55) {
+        const f = 700 + Math.random() * 900;
+        tone(f, f * (0.96 + Math.random() * 0.08), 2.2, "sine", 0.012, Math.random() * 3, 0.9);
+      } else {
+        thump(0, 0.05); thump(0.32, 0.035);   // distant heartbeat
+      }
+    }, 9000);
+  }
+  function droneSwell(amount, secs) {          // night tension swell
+    if (!actx || !droneGain) return;
+    const t = actx.currentTime;
+    droneGain.gain.cancelScheduledValues(t);
+    droneGain.gain.setTargetAtTime(amount, t, secs / 3);
+    droneGain.gain.setTargetAtTime(0.035, t + secs, 1.5);
+  }
+  const sClick = () => tone(420, 380, 0.05, "square", 0.025);
+  const sReveal = () => { tone(300, 70, 0.5, "sawtooth", 0.04, 0, 0.02); tone(900, 1400, 0.35, "sine", 0.02, 0.1, 0.05); };
+  function sNight() {
+    droneSwell(0.08, 4);
+    tone(330, 329, 0.7, "triangle", 0.05, 0);     // E4
+    tone(262, 261, 1.1, "triangle", 0.05, 0.55);  // C4 — dark descending pair
+    tone(131, 65, 2.2, "sine", 0.05, 1.1, 0.4);   // sinking sub
+    for (let i = 0; i < 4; i++) { thump(2 + i * 0.8, 0.09); thump(2.3 + i * 0.8, 0.06); }
+  }
+  function sDay() {
+    tone(523, 524, 0.5, "triangle", 0.04, 0, 0.05);
+    tone(659, 660, 0.5, "triangle", 0.04, 0.18, 0.05);
+    tone(784, 786, 0.8, "triangle", 0.035, 0.36, 0.05);
+  }
+  function sDeath() {
+    bell(196, 2.6, 0.09, 0.1);
+    bell(196, 2.6, 0.07, 1.3);
+    tone(98, 49, 2.5, "sine", 0.06, 0.1, 0.3);
+  }
+  const sSaved = () => { tone(587, 880, 0.5, "sine", 0.035, 0, 0.1); tone(880, 1175, 0.7, "sine", 0.025, 0.3, 0.1); };
+  function sVote() {
+    droneSwell(0.07, 5);
+    for (let i = 0; i < 5; i++) tone(1100, 1050, 0.04, "square", 0.03, i * 0.4);
+    tone(110, 220, 2.2, "sawtooth", 0.018, 0, 1.8);   // riser underneath
+  }
+  function sGavel() {
+    thump(0, 0.16); tone(2400, 600, 0.08, "square", 0.04, 0.01);
+    thump(0.22, 0.12);
+    bell(147, 2, 0.07, 0.4);
+  }
+  const sTie = () => { tone(392, 392, 0.3, "triangle", 0.04); tone(392, 330, 0.5, "triangle", 0.04, 0.3); };
+  function sMafiaFound() {   // detective hits / mafia revealed
+    tone(466, 460, 0.5, "sawtooth", 0.045, 0, 0.02);
+    tone(660, 655, 0.5, "sawtooth", 0.035, 0, 0.02);  // tritone sting
+    tone(98, 50, 1.4, "sine", 0.06, 0.15, 0.1);
+  }
+  const sInnocent = () => { tone(523, 524, 0.35, "sine", 0.04, 0, 0.05); tone(659, 660, 0.6, "sine", 0.03, 0.2, 0.05); };
+  const sGhost = () => { tone(800, 90, 2.4, "sine", 0.05, 0, 0.4); tone(1200, 140, 2.6, "sine", 0.025, 0.2, 0.5); };
+  function sTownWin() {
+    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f * 1.002, 0.5, "triangle", 0.05, i * 0.16, 0.02));
+    bell(523, 2.5, 0.05, 0.9);
+  }
+  function sMafiaWin() {
+    [330, 311, 262, 220].forEach((f, i) => tone(f, f * 0.99, 0.8, "sawtooth", 0.045, i * 0.4, 0.05));
+    tone(55, 41, 3.2, "sine", 0.08, 1.2, 0.4);
+    for (let i = 0; i < 3; i++) thump(2 + i * 0.5, 0.12);
+  }
+  function gameSound(msg) {
+    if (!actx) return;
+    if (msg.t === "night") sNight();
+    else if (msg.t === "announce") { sDay(); if (msg.died) setTimeout(() => sDeath(), 500); else setTimeout(() => sSaved(), 500); }
+    else if (msg.t === "voteOpen") sVote();
+    else if (msg.t === "voteResult") { if (msg.eliminated) { sGavel(); if (msg.role === "mafia") setTimeout(() => sMafiaFound(), 700); } else sTie(); }
+    else if (msg.t === "checkResult") (msg.isMafia ? sMafiaFound : sInnocent)();
+    else if (msg.t === "youDead") sGhost();
+    else if (msg.t === "over") (msg.winner === "town" ? sTownWin : sMafiaWin)();
+  }
+
+  /* =====================================================
      GAME ENGINE (host-side, transport-agnostic, testable)
      ===================================================== */
   function createEngine(send) {
@@ -498,6 +634,7 @@
   /* ---- message handling / rendering ---- */
   function handleMsg(msg) {
     lastMsg = msg;
+    gameSound(msg);
     if (msg.t === "lobby") { iAmDead = false; myRole = null; roleSeen = false; renderLobby(msg); }
     else if (msg.t === "role") { myRole = msg; roleSeen = false; renderRole(msg); }
     else if (msg.t === "night") renderNight(msg);
@@ -512,7 +649,7 @@
 
   function hostBtn(label, fn, extra) {
     const id = "hb" + Math.random().toString(36).slice(2, 8);
-    setTimeout(() => { const el = document.getElementById(id); if (el) el.onclick = fn; }, 0);
+    setTimeout(() => { const el = document.getElementById(id); if (el) el.onclick = () => { ensureAudio(); startAmbient(); sClick(); fn(); }; }, 0);
     return `<button class="btn ${extra || ""}" id="${id}">${label}</button>`;
   }
 
@@ -582,7 +719,7 @@
             <div class="rdesc" style="opacity:.6">There ${msg.mafiaCount > 1 ? "are" : "is"} ${msg.mafiaCount} Mafia among ${msg.players.length} players.</div>
           </div>` : ""}
         ${hostBtn(roleSeen ? "HIDE & CONTINUE ➜" : "👁️ TAP TO REVEAL", () => {
-          if (!roleSeen) { roleSeen = true; renderRole(msg); }
+          if (!roleSeen) { roleSeen = true; sReveal(); renderRole(msg); }
           else if (lastMsg && lastMsg.t === "night") renderNight(lastMsg);
           else showWait("Night is falling…");
         })}
@@ -595,14 +732,14 @@
       const id = "pk" + Math.random().toString(36).slice(2, 8);
       setTimeout(() => {
         const el = document.getElementById(id);
-        if (el) el.onclick = () => toHost(kind === "vote" ? { t: "vote", target: n } : { t: "action", kind, target: n });
+        if (el) el.onclick = () => { ensureAudio(); sClick(); toHost(kind === "vote" ? { t: "vote", target: n } : { t: "action", kind, target: n }); };
       }, 0);
       return `<button class="pick" id="${id}">${esc(n)}</button>`;
     }).join("");
     let skip = "";
     if (kind === "vote") {
       const sid = "pkskip";
-      setTimeout(() => { const el = document.getElementById(sid); if (el) el.onclick = () => toHost({ t: "vote", target: "skip" }); }, 0);
+      setTimeout(() => { const el = document.getElementById(sid); if (el) el.onclick = () => { ensureAudio(); sClick(); toHost({ t: "vote", target: "skip" }); }; }, 0);
       skip = `<button class="pick skip" id="${sid}">🤷 Skip — vote no one</button>`;
     }
     return `<div class="pick-grid">${btns}${skip}</div>`;
