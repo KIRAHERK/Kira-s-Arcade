@@ -204,10 +204,7 @@
     </div>
   </div>
   <div class="links">
-    <a href="index.html">🎰 Slots</a>
-    <a href="runner.html">🏃 Runner</a>
-    <a href="candy.html">🍬 Candy</a>
-    <a href="stack.html">🏗️ Stack</a>
+    <a href="index.html">🏠 All games</a>
   </div>
 </div>
 
@@ -267,6 +264,38 @@
     push: () => tone(440, 440, 0.15, "sine", 0.05),
   };
   const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
+
+  /* ---- background music ---- */
+  const MUSIC_BASS = [110, 0, 0, 147, 0, 0, 131, 0];
+  const MUSIC_LEAD = [440, 0, 523, 0, 0, 587, 0, 659, 0, 0, 587, 0, 523, 0, 0, 0];
+  const MUSIC_SPB = 0.26;
+  let mStep = 0, mNext = 0, mTimer = null;
+  function mNote(f, dur, type, vol, when) {
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function startMusic() {
+    ensureAudio();
+    if (mTimer || !actx) return;
+    mStep = 0; mNext = actx.currentTime + 0.1;
+    mTimer = setInterval(() => {
+      if (!actx) return;
+      while (mNext < actx.currentTime + 0.35) {
+        const w = Math.max(0, mNext - actx.currentTime);
+        const b = MUSIC_BASS[mStep % MUSIC_BASS.length];
+        const l = MUSIC_LEAD[mStep % MUSIC_LEAD.length];
+        if (b) mNote(b, 0.2, "triangle", 0.032, w);
+        if (l) mNote(l, 0.12, "square", 0.012, w);
+        mStep++; mNext += MUSIC_SPB;
+      }
+    }, 100);
+  }
+
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ---- cards ---- */
@@ -374,6 +403,7 @@
     if (state !== "bet" || save.balance < BETS[betIndex]) return;
     ensureAudio(); sfx.chip();
     state = "play";
+    startMusic();
     const bet = BETS[betIndex];
     save.balance -= bet; persist();
     hands = [{ cards: [], bet, done: false }];

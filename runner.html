@@ -107,7 +107,7 @@
       <div><span>🚆</span>Don't hit the trains!</div>
     </div>
     <button class="big-btn" id="startBtn">RUN!</button>
-    <a class="back-link" href="index.html">🎰 Lucky Spin</a> · <a class="back-link" href="candy.html">🍬 Candy</a> · <a class="back-link" href="blackjack.html">🃏 Blackjack</a> · <a class="back-link" href="stack.html">🏗️ Stack</a>
+    <a class="back-link" href="index.html">🏠 All games</a>
   </div>
 </div>
 
@@ -121,7 +121,7 @@
       <div id="walletLine" style="margin-top:6px;color:#ffd166;font-size:14px;font-weight:700;"></div>
     </div>
     <button class="big-btn" id="retryBtn">RUN AGAIN</button>
-    <a class="back-link" href="index.html">🎰 Lucky Spin</a> · <a class="back-link" href="candy.html">🍬 Candy</a> · <a class="back-link" href="blackjack.html">🃏 Blackjack</a> · <a class="back-link" href="stack.html">🏗️ Stack</a>
+    <a class="back-link" href="index.html">🏠 All games</a>
   </div>
 </div>
 
@@ -177,6 +177,38 @@
     crash: () => { tone(300, 60, 0.45, "sawtooth", 0.09); tone(180, 40, 0.5, "square", 0.06); },
   };
   const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
+
+  /* ---- background music ---- */
+  const MUSIC_BASS = [110, 110, 0, 110, 131, 0, 110, 0, 110, 110, 0, 110, 165, 0, 147, 0];
+  const MUSIC_LEAD = [440, 0, 494, 523, 0, 587, 523, 0, 440, 0, 523, 0, 659, 587, 0, 0];
+  const MUSIC_SPB = 0.13;
+  let mStep = 0, mNext = 0, mTimer = null;
+  function mNote(f, dur, type, vol, when) {
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function startMusic() {
+    ensureAudio();
+    if (mTimer || !actx) return;
+    mStep = 0; mNext = actx.currentTime + 0.1;
+    mTimer = setInterval(() => {
+      if (!actx) return;
+      while (mNext < actx.currentTime + 0.35) {
+        const w = Math.max(0, mNext - actx.currentTime);
+        const b = MUSIC_BASS[mStep % MUSIC_BASS.length];
+        const l = MUSIC_LEAD[mStep % MUSIC_LEAD.length];
+        if (b) mNote(b, 0.2, "triangle", 0.032, w);
+        if (l) mNote(l, 0.12, "square", 0.012, w);
+        mStep++; mNext += MUSIC_SPB;
+      }
+    }, 100);
+  }
+
 
   /* ---------- Game state ---------- */
   const SAVE_KEY = "metroDashBest_v1";
@@ -632,6 +664,7 @@
 
   function startGame() {
     ensureAudio();
+    startMusic();
     resetGame();
     menu.classList.add("hidden");
     gameover.classList.add("hidden");

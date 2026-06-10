@@ -144,10 +144,7 @@
 <div class="hint">Swipe to slide — matching tiles fuse. Reach 2048!</div>
 
 <div class="footer-row">
-  <a class="ghost-btn" href="index.html">🎰 Slots</a>
-  <a class="ghost-btn" href="bird.html">🐦 Bird</a>
-  <a class="ghost-btn" href="stack.html">🏗️ Stack</a>
-  <a class="ghost-btn" href="candy.html">🍬 Candy</a>
+  <a class="ghost-btn" href="index.html">🏠 All games</a>
 </div>
 
 <div class="overlay hidden" id="overOverlay">
@@ -210,6 +207,38 @@
     lose: () => [360, 300, 240, 180].forEach((f, i) => tone(f, f * 0.95, 0.2, "sine", 0.06, i * 0.14)),
   };
   const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
+
+  /* ---- background music ---- */
+  const MUSIC_BASS = [87, 0, 0, 0, 104, 0, 0, 0];
+  const MUSIC_LEAD = [349, 0, 0, 415, 0, 0, 440, 0, 0, 415, 0, 0, 349, 0, 0, 0];
+  const MUSIC_SPB = 0.3;
+  let mStep = 0, mNext = 0, mTimer = null;
+  function mNote(f, dur, type, vol, when) {
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function startMusic() {
+    ensureAudio();
+    if (mTimer || !actx) return;
+    mStep = 0; mNext = actx.currentTime + 0.1;
+    mTimer = setInterval(() => {
+      if (!actx) return;
+      while (mNext < actx.currentTime + 0.35) {
+        const w = Math.max(0, mNext - actx.currentTime);
+        const b = MUSIC_BASS[mStep % MUSIC_BASS.length];
+        const l = MUSIC_LEAD[mStep % MUSIC_LEAD.length];
+        if (b) mNote(b, 0.2, "triangle", 0.032, w);
+        if (l) mNote(l, 0.12, "square", 0.012, w);
+        mStep++; mNext += MUSIC_SPB;
+      }
+    }, 100);
+  }
+
 
   /* ---- layout ---- */
   function measure() {
@@ -382,12 +411,14 @@
   /* ---- input ---- */
   window.addEventListener("keydown", (e) => {
     ensureAudio();
+    startMusic();
     const map = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", a: "left", d: "right", w: "up", s: "down" };
     if (map[e.key]) { e.preventDefault(); move(map[e.key]); }
   });
   let tx = 0, ty = 0;
   window.addEventListener("touchstart", (e) => {
     ensureAudio();
+    startMusic();
     tx = e.touches[0].clientX; ty = e.touches[0].clientY;
   }, { passive: true });
   window.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
