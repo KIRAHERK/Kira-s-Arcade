@@ -108,6 +108,7 @@
       Height <b id="finalScore">0</b><br>
       <span id="perfectCount"></span>
       <div class="newbest hidden" id="newBest">★ NEW BEST! ★</div>
+      <div id="walletLine" style="margin-top:6px;color:#ffd166;font-size:14px;font-weight:700;"></div>
     </div>
     <button class="big-btn" id="retryBtn">BUILD AGAIN</button>
     <div class="links">
@@ -163,6 +164,16 @@
 
   /* ---- state ---- */
   const SAVE_KEY = "skyStackBest_v1";
+  /* ---- shared arcade wallet ---- */
+  const WALLET_KEY = "luckySpinSave_v1";
+  function walletAdd(n) {
+    let s = { balance: 1000, betIndex: 1, spins: 0, biggestWin: 0 };
+    try { const j = JSON.parse(localStorage.getItem(WALLET_KEY)); if (j && typeof j.balance === "number") s = Object.assign(s, j); } catch (e) {}
+    s.balance += n;
+    localStorage.setItem(WALLET_KEY, JSON.stringify(s));
+    return s.balance;
+  }
+
   let best = parseInt(localStorage.getItem(SAVE_KEY) || "0", 10) || 0;
   const BH = 34;            // block height
   const D = 16;             // 2.5D depth offset
@@ -383,6 +394,9 @@
       localStorage.setItem(SAVE_KEY, String(best));
       document.getElementById("newBest").classList.remove("hidden");
     } else document.getElementById("newBest").classList.add("hidden");
+    const earned = score * 3 + perfects * 5;
+    const wbal = walletAdd(earned);
+    document.getElementById("walletLine").textContent = "+\u{1FA99} " + earned + " earned \u00b7 Wallet " + wbal.toLocaleString("en-US");
     document.getElementById("finalScore").textContent = score;
     document.getElementById("perfectCount").textContent = perfects ? "⭐ " + perfects + " perfect drop" + (perfects > 1 ? "s" : "") : "";
     bestEl.textContent = "BEST " + best;

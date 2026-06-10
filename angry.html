@@ -51,6 +51,7 @@
   .panel .result b { color: #c0392b; font-size: 28px; }
   .stars { font-size: 36px; letter-spacing: 4px; margin-bottom: 6px; }
   .newbest { color: #1f9c5b; font-weight: 800; }
+  .wallet-line { font-size: 14px; font-weight: 700; color: #8a6510; margin-bottom: 4px; }
   .big-btn {
     width: 100%; padding: 15px; border: none; border-radius: 14px;
     font-size: 18px; font-weight: 800; letter-spacing: 2px;
@@ -78,7 +79,7 @@
 <div class="overlay" id="menu">
   <div class="panel">
     <h1>😡 GRUMPY BIRDS</h1>
-    <div class="tag">Drag the bird back on the slingshot,<br>aim, and <b>let it rip</b>.<br>Squash every piggy 🐷 to clear the level!</div>
+    <div class="tag">Drag the bird back on the slingshot,<br>aim, and <b>let it rip</b>.<br>Squash every piggy 🐷 to clear the level!<br>Wins pay 🪙 arcade coins.</div>
     <button class="big-btn" id="startBtn">PLAY</button>
     <div class="links">
       <a href="index.html">🎰 Slots</a> ·
@@ -94,6 +95,7 @@
     <div class="stars" id="starsEl"></div>
     <h1 id="resultTitle">LEVEL CLEARED!</h1>
     <div class="result">Score <b id="resultScore">0</b><div class="newbest hidden" id="newBest">★ NEW BEST! ★</div></div>
+    <div class="wallet-line" id="walletLine"></div>
     <button class="big-btn" id="nextBtn">NEXT LEVEL ➜</button>
     <div class="links">
       <a href="index.html">🎰 Slots</a> ·
@@ -128,6 +130,16 @@
   window.addEventListener("resize", resize);
   resize();
   const toWorld = (px, py) => [(px - offX) / scale, (py - offY) / scale];
+
+  /* ---- shared arcade wallet ---- */
+  const WALLET_KEY = "luckySpinSave_v1";
+  function walletAdd(n) {
+    let s = { balance: 1000, betIndex: 1, spins: 0, biggestWin: 0 };
+    try { const j = JSON.parse(localStorage.getItem(WALLET_KEY)); if (j && typeof j.balance === "number") s = Object.assign(s, j); } catch (e) {}
+    s.balance += n;
+    localStorage.setItem(WALLET_KEY, JSON.stringify(s));
+    return s.balance;
+  }
 
   /* ---- audio ---- */
   let actx = null;
@@ -168,10 +180,10 @@
   let mode = "menu";   // menu | aim | fly | result
   let level = 1, score = 0, levelStartScore = 0;
   let birdsLeft = 0;
-  let bird = null;     // {x,y,vx,vy,resting}
-  let bodies = [];     // {x,y,w,h,vx,vy,type:'wood'|'stone'|'pig',hp,dead}
+  let bird = null;     // {x,y,vx,vy,spin}
+  let bodies = [];     // {x,y,w,h,vx,vy,ang,angV,type,hp,dead}
   let particles = [];
-  let dragging = false, dragX = 0, dragY = 0;
+  let dragging = false;
   let settleTimer = 0, flyTimer = 0;
   let won = false;
 
@@ -179,9 +191,10 @@
   const scoreEl = document.getElementById("scoreEl"), levelEl = document.getElementById("levelEl"), birdsEl = document.getElementById("birdsEl");
 
   /* ---- levels ---- */
-  const wood = (x, y, w, h) => ({ x, y, w, h, vx: 0, vy: 0, type: "wood", hp: 70 });
-  const stone = (x, y, w, h) => ({ x, y, w, h, vx: 0, vy: 0, type: "stone", hp: 170 });
-  const pig = (cx, yTop) => ({ x: cx - 16, y: yTop, w: 32, h: 32, vx: 0, vy: 0, type: "pig", hp: 30 });
+  const mkBody = (x, y, w, h, type, hp) => ({ x, y, w, h, vx: 0, vy: 0, ang: 0, angV: 0, type, hp });
+  const wood = (x, y, w, h) => mkBody(x, y, w, h, "wood", 70);
+  const stone = (x, y, w, h) => mkBody(x, y, w, h, "stone", 170);
+  const pig = (cx, yTop) => mkBody(cx - 16, yTop, 32, 32, "pig", 30);
 
   function towerAt(x, h2, withRoof, pigInside) {
     const out = [];
@@ -214,7 +227,6 @@
       bodies.push(pig(490, GROUND - 32));
       bodies.push(...towerAt(620, true, true, true));
     } else {
-      // procedural: 2-3 stacks, mixed materials
       const stacks = 2 + (n % 2);
       for (let i = 0; i < stacks; i++) {
         const x = 420 + i * (180 - Math.min(n * 4, 40));
@@ -238,7 +250,7 @@
   function loadBird() {
     if (birdsLeft <= 0) { bird = null; return; }
     birdsLeft--;
-    bird = { x: SLING.x, y: SLING.y, vx: 0, vy: 0, resting: false };
+    bird = { x: SLING.x, y: SLING.y, vx: 0, vy: 0, spin: 0 };
     mode = "aim";
     updateHud();
   }
@@ -259,55 +271,64 @@
   }
 
   /* ---- physics ---- */
+  // effective axis-aligned bounding box of a (possibly rotated) body
+  function eAABB(b) {
+    const c = Math.abs(Math.cos(b.ang)), s = Math.abs(Math.sin(b.ang));
+    const ew = c * b.w + s * b.h, eh = s * b.w + c * b.h;
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    return { x: cx - ew / 2, y: cy - eh / 2, w: ew, h: eh, cx, cy };
+  }
+
   function damage(b, dmg) {
     if (b.dead || dmg <= 0) return;
     b.hp -= dmg;
     if (b.hp <= 0) {
       b.dead = true;
+      const e = eAABB(b);
       if (b.type === "pig") {
         score += 500;
         sfx.oink(); buzz([30, 20, 60]);
-        burst(b.x + b.w / 2, b.y + b.h / 2, "#5fd068", 16, 200);
+        burst(e.cx, e.cy, "#5fd068", 16, 200);
       } else {
         score += 50;
         sfx.crack(); buzz(15);
-        burst(b.x + b.w / 2, b.y + b.h / 2, b.type === "stone" ? "#9aa5ad" : "#c98c4a", 12, 150);
+        burst(e.cx, e.cy, b.type === "stone" ? "#9aa5ad" : "#c98c4a", 12, 150);
       }
       updateHud();
     }
   }
 
   function stepPhysics(dt) {
-    // bird
+    // ---- bird ----
     if (bird && mode === "fly") {
       bird.vy += GRAV * dt;
       bird.x += bird.vx * dt;
       bird.y += bird.vy * dt;
-      // ground
+      bird.spin = bird.vx * 0.01;
       if (bird.y + BIRD_R > GROUND) {
         bird.y = GROUND - BIRD_R;
         if (Math.abs(bird.vy) > 60) sfx.thud(Math.abs(bird.vy));
         bird.vy *= -0.38;
         bird.vx *= 0.72;
       }
-      // bodies
       for (const b of bodies) {
         if (b.dead) continue;
-        const cx = Math.max(b.x, Math.min(bird.x, b.x + b.w));
-        const cy = Math.max(b.y, Math.min(bird.y, b.y + b.h));
+        const e = eAABB(b);
+        const cx = Math.max(e.x, Math.min(bird.x, e.x + e.w));
+        const cy = Math.max(e.y, Math.min(bird.y, e.y + e.h));
         const dx = bird.x - cx, dy = bird.y - cy;
         const d2 = dx * dx + dy * dy;
         if (d2 < BIRD_R * BIRD_R) {
           const speed = Math.hypot(bird.vx, bird.vy);
-          // impact damage (pigs are squishier)
           damage(b, speed * (b.type === "pig" ? 0.35 : 0.22));
           if (speed > 80) { sfx.thud(speed); buzz(10); }
-          // push the body
           if (!b.dead) {
             b.vx += bird.vx * 0.55;
             b.vy += bird.vy * 0.3 - 30;
+            // torque: cross(r, impulse) — off-center hits spin the block
+            const rx = cx - e.cx, ry = cy - e.cy;
+            if (b.type !== "pig") b.angV += (rx * bird.vy - ry * bird.vx) * 0.00045;
           }
-          // bounce the bird away
           const d = Math.sqrt(d2) || 1;
           const nx = dx / d, ny = dy / d;
           const vn = bird.vx * nx + bird.vy * ny;
@@ -322,53 +343,97 @@
       }
     }
 
-    // bodies
+    // ---- bodies: integrate ----
     for (const b of bodies) {
       if (b.dead) continue;
       b.vy += GRAV * dt;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
+      if (b.type !== "pig") b.ang += b.angV * dt;
+
+      const e = eAABB(b);
       // ground
-      if (b.y + b.h > GROUND) {
+      if (e.y + e.h > GROUND) {
         const impact = b.vy;
-        b.y = GROUND - b.h;
+        b.y += GROUND - (e.y + e.h);     // shift center up by penetration
         if (impact > 230) damage(b, (impact - 230) * (b.type === "pig" ? 0.25 : 0.1));
         b.vy = impact > 100 ? -impact * 0.12 : 0;
         b.vx *= 0.6;
         if (Math.abs(b.vx) < 6) b.vx = 0;
+        // rotation settles on the ground: damp and snap to flat
+        b.angV *= 0.55;
+        if (Math.abs(b.angV) < 0.6 && Math.abs(b.vx) < 12) {
+          const snap = Math.round(b.ang / (Math.PI / 2)) * (Math.PI / 2);
+          b.ang += (snap - b.ang) * Math.min(1, dt * 9);
+          if (Math.abs(snap - b.ang) < 0.015) { b.ang = snap; b.angV = 0; }
+        }
       }
-      if (b.x < -60 || b.x > GW + 60) b.dead = true;
+      if (b.x < -80 || b.x > GW + 80) b.dead = true;
     }
 
-    // body-body collisions, a few iterations for stability
+    // ---- topple check: unsupported overhang produces torque ----
+    for (const b of bodies) {
+      if (b.dead || b.type === "pig") continue;
+      const e = eAABB(b);
+      const bottom = e.y + e.h;
+      if (Math.abs(b.vy) > 30) continue;          // only near-resting bodies
+      let minS = Infinity, maxS = -Infinity, supported = false;
+      if (bottom > GROUND - 3) { supported = true; minS = e.x; maxS = e.x + e.w; }
+      else {
+        for (const c of bodies) {
+          if (c === b || c.dead) continue;
+          const ec = eAABB(c);
+          if (Math.abs(bottom - ec.y) < 5 && e.x < ec.x + ec.w && e.x + e.w > ec.x) {
+            supported = true;
+            minS = Math.min(minS, Math.max(e.x, ec.x));
+            maxS = Math.max(maxS, Math.min(e.x + e.w, ec.x + ec.w));
+          }
+        }
+      }
+      if (supported) {
+        // center of mass past the edge of support -> tip over
+        if (e.cx < minS - 2) b.angV -= (minS - e.cx) * 0.25 * dt * 60;
+        else if (e.cx > maxS + 2) b.angV += (e.cx - maxS) * 0.25 * dt * 60;
+      }
+      // tall thin blocks knocked sideways while standing: convert slide to tip
+      if (supported && b.h > b.w * 2 && Math.abs(b.vx) > 40 && Math.abs(Math.sin(b.ang)) < 0.3) {
+        b.angV += Math.sign(b.vx) * Math.abs(b.vx) * 0.012;
+        b.vx *= 0.85;
+      }
+    }
+
+    // ---- body-body collisions ----
     for (let iter = 0; iter < 3; iter++) {
       for (let i = 0; i < bodies.length; i++) {
         const a = bodies[i];
         if (a.dead) continue;
+        const ea = eAABB(a);
         for (let j = i + 1; j < bodies.length; j++) {
           const b = bodies[j];
           if (b.dead) continue;
-          const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
-          const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+          const eb = eAABB(b);
+          const ox = Math.min(ea.x + ea.w, eb.x + eb.w) - Math.max(ea.x, eb.x);
+          const oy = Math.min(ea.y + ea.h, eb.y + eb.h) - Math.max(ea.y, eb.y);
           if (ox <= 0 || oy <= 0) continue;
           const ma = a.w * a.h, mb = b.w * b.h;
           const ta = mb / (ma + mb), tb = ma / (ma + mb);
           if (oy < ox) {
-            // vertical contact
-            const sign = a.y < b.y ? 1 : -1;
+            const sign = ea.cy < eb.cy ? 1 : -1;
             a.y -= oy * ta * sign;
             b.y += oy * tb * sign;
             const rel = (a.vy - b.vy) * sign;
             if (rel > 0) {
-              const imp = rel;
-              if (imp > 260) { damage(a, (imp - 260) * 0.08); damage(b, (imp - 260) * (b.type === "pig" || a.type === "pig" ? 0.3 : 0.08)); }
-              a.vy -= imp * ta * sign;
-              b.vy += imp * tb * sign;
+              if (rel > 260) { damage(a, (rel - 260) * 0.08); damage(b, (rel - 260) * (b.type === "pig" || a.type === "pig" ? 0.3 : 0.08)); }
+              a.vy -= rel * ta * sign;
+              b.vy += rel * tb * sign;
+              // landing off-center on something tips it
+              const off = (eb.cx - ea.cx) / Math.max(ea.w, 20);
+              if (a.type !== "pig") a.angV += -off * rel * 0.004;
             }
-            // friction
             a.vx *= 0.92; b.vx *= 0.92;
+            a.angV *= 0.9; b.angV *= 0.9;
           } else {
-            const sign = a.x < b.x ? 1 : -1;
+            const sign = ea.cx < eb.cx ? 1 : -1;
             a.x -= ox * ta * sign;
             b.x += ox * tb * sign;
             const rel = (a.vx - b.vx) * sign;
@@ -376,10 +441,20 @@
               if (rel > 280) { damage(a, (rel - 280) * 0.08); damage(b, (rel - 280) * 0.12); }
               a.vx -= rel * ta * sign * 1.05;
               b.vx += rel * tb * sign * 1.05;
+              // side hits above/below center add spin
+              const contactY = (Math.max(ea.y, eb.y) + Math.min(ea.y + ea.h, eb.y + eb.h)) / 2;
+              if (a.type !== "pig") a.angV += -sign * rel * ((contactY - ea.cy) / Math.max(ea.h, 20)) * 0.01;
+              if (b.type !== "pig") b.angV += sign * rel * ((contactY - eb.cy) / Math.max(eb.h, 20)) * 0.01;
             }
           }
         }
       }
+    }
+
+    // clamp spin
+    for (const b of bodies) {
+      if (b.dead) continue;
+      b.angV = Math.max(-7, Math.min(7, b.angV));
     }
 
     // particles
@@ -395,7 +470,7 @@
   function everythingCalm() {
     if (bird && mode === "fly" && (Math.abs(bird.vx) > 14 || Math.abs(bird.vy) > 14) && bird.x > -40 && bird.x < GW + 40) return false;
     for (const b of bodies) {
-      if (!b.dead && (Math.abs(b.vx) > 12 || Math.abs(b.vy) > 12)) return false;
+      if (!b.dead && (Math.abs(b.vx) > 12 || Math.abs(b.vy) > 12 || Math.abs(b.angV) > 0.7)) return false;
     }
     return true;
   }
@@ -403,7 +478,7 @@
   function endTurn() {
     if (pigsAlive() === 0) {
       won = true;
-      score += birdsLeft * 300;       // leftover bird bonus
+      score += birdsLeft * 300;
       showResult(true);
     } else if (birdsLeft <= 0) {
       showResult(false);
@@ -419,10 +494,7 @@
     ensureAudio();
     if (mode !== "aim" || !bird) return;
     const [wx, wy] = pointerPos(e);
-    if (Math.hypot(wx - bird.x, wy - bird.y) < 70) {
-      dragging = true;
-      dragX = wx; dragY = wy;
-    }
+    if (Math.hypot(wx - bird.x, wy - bird.y) < 70) dragging = true;
   });
   window.addEventListener("pointermove", (e) => {
     if (!dragging || mode !== "aim" || !bird) return;
@@ -463,52 +535,51 @@
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
   }
-  function drawBirdShape(x, y, r, angry) {
+  function drawBirdShape(x, y, r, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (rot) ctx.rotate(rot);
+    ctx.translate(-x, -y);
     ctx.fillStyle = "#e74c3c";
     ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
     ctx.fillStyle = "#c0392b";
     ctx.beginPath(); ctx.arc(x, y + r * 0.45, r * 0.75, 0, Math.PI); ctx.fill();
-    // belly
     ctx.fillStyle = "#f5d7b2";
     ctx.beginPath(); ctx.ellipse(x, y + r * 0.45, r * 0.55, r * 0.4, 0, 0, 7); ctx.fill();
-    // eyes
     ctx.fillStyle = "#fff";
     ctx.beginPath(); ctx.arc(x + r * 0.3, y - r * 0.2, r * 0.28, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(x - r * 0.15, y - r * 0.2, r * 0.28, 0, 7); ctx.fill();
     ctx.fillStyle = "#1b1b1b";
     ctx.beginPath(); ctx.arc(x + r * 0.34, y - r * 0.18, r * 0.12, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(x - r * 0.1, y - r * 0.18, r * 0.12, 0, 7); ctx.fill();
-    // angry brows
     ctx.strokeStyle = "#1b1b1b";
     ctx.lineWidth = r * 0.16;
     ctx.beginPath(); ctx.moveTo(x - r * 0.45, y - r * 0.6); ctx.lineTo(x + r * 0.05, y - r * 0.38); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + r * 0.65, y - r * 0.62); ctx.lineTo(x + r * 0.12, y - r * 0.38); ctx.stroke();
-    // beak
     ctx.fillStyle = "#f4a127";
     ctx.beginPath();
     ctx.moveTo(x + r * 0.05, y + r * 0.05);
     ctx.lineTo(x + r * 0.75, y + r * 0.18);
     ctx.lineTo(x + r * 0.1, y + r * 0.4);
     ctx.closePath(); ctx.fill();
+    ctx.restore();
   }
   function drawPig(b) {
-    const cx = b.x + b.w / 2, cy = b.y + b.h / 2, r = b.w / 2;
+    const e = eAABB(b);
+    const cx = e.cx, cy = e.cy, r = b.w / 2;
     ctx.fillStyle = "#5fd068";
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
     ctx.fillStyle = "#46a14e";
     ctx.beginPath(); ctx.arc(cx, cy + r * 0.5, r * 0.7, 0, Math.PI); ctx.fill();
-    // ears
     ctx.fillStyle = "#5fd068";
     ctx.beginPath(); ctx.arc(cx - r * 0.55, cy - r * 0.75, r * 0.22, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(cx + r * 0.55, cy - r * 0.75, r * 0.22, 0, 7); ctx.fill();
-    // eyes
     ctx.fillStyle = "#fff";
     ctx.beginPath(); ctx.arc(cx - r * 0.42, cy - r * 0.25, r * 0.2, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(cx + r * 0.42, cy - r * 0.25, r * 0.2, 0, 7); ctx.fill();
     ctx.fillStyle = "#1b1b1b";
     ctx.beginPath(); ctx.arc(cx - r * 0.4, cy - r * 0.22, r * 0.09, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(cx + r * 0.44, cy - r * 0.22, r * 0.09, 0, 7); ctx.fill();
-    // snout
     ctx.fillStyle = "#7ee487";
     rr(cx - r * 0.35, cy - r * 0.05, r * 0.7, r * 0.5, r * 0.2); ctx.fill();
     ctx.fillStyle = "#2f7a36";
@@ -516,42 +587,45 @@
     ctx.beginPath(); ctx.arc(cx + r * 0.15, cy + r * 0.2, r * 0.07, 0, 7); ctx.fill();
   }
   function drawBlock(b) {
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(b.ang);
+    const x = -b.w / 2, y = -b.h / 2;
     if (b.type === "stone") {
       ctx.fillStyle = "#9aa5ad";
-      rr(b.x, b.y, b.w, b.h, 3); ctx.fill();
+      rr(x, y, b.w, b.h, 3); ctx.fill();
       ctx.strokeStyle = "rgba(0,0,0,.25)";
       ctx.lineWidth = 2;
-      rr(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 3); ctx.stroke();
+      rr(x + 1, y + 1, b.w - 2, b.h - 2, 3); ctx.stroke();
     } else {
       ctx.fillStyle = "#c98c4a";
-      rr(b.x, b.y, b.w, b.h, 3); ctx.fill();
+      rr(x, y, b.w, b.h, 3); ctx.fill();
       ctx.strokeStyle = "rgba(90, 50, 10, .4)";
       ctx.lineWidth = 1.5;
-      // wood grain
       if (b.w > b.h) {
-        for (let gx = b.x + 14; gx < b.x + b.w - 4; gx += 18) {
-          ctx.beginPath(); ctx.moveTo(gx, b.y + 2); ctx.lineTo(gx, b.y + b.h - 2); ctx.stroke();
+        for (let gx = x + 14; gx < x + b.w - 4; gx += 18) {
+          ctx.beginPath(); ctx.moveTo(gx, y + 2); ctx.lineTo(gx, y + b.h - 2); ctx.stroke();
         }
       } else {
-        for (let gy = b.y + 14; gy < b.y + b.h - 4; gy += 18) {
-          ctx.beginPath(); ctx.moveTo(b.x + 2, gy); ctx.lineTo(b.x + b.w - 2, gy); ctx.stroke();
+        for (let gy = y + 14; gy < y + b.h - 4; gy += 18) {
+          ctx.beginPath(); ctx.moveTo(x + 2, gy); ctx.lineTo(x + b.w - 2, gy); ctx.stroke();
         }
       }
     }
-    // damage cracks
     if (b.hp < (b.type === "stone" ? 100 : 40)) {
       ctx.strokeStyle = "rgba(0,0,0,.45)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(b.x + b.w * 0.3, b.y);
-      ctx.lineTo(b.x + b.w * 0.5, b.y + b.h * 0.4);
-      ctx.lineTo(b.x + b.w * 0.25, b.y + b.h * 0.7);
+      ctx.moveTo(x + b.w * 0.3, y);
+      ctx.lineTo(x + b.w * 0.5, y + b.h * 0.4);
+      ctx.lineTo(x + b.w * 0.25, y + b.h * 0.7);
       ctx.stroke();
     }
+    ctx.restore();
   }
 
   function draw() {
-    // sky
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "#8fd3f4");
     g.addColorStop(0.7, "#bde8f7");
@@ -563,7 +637,6 @@
     ctx.translate(offX, offY);
     ctx.scale(scale, scale);
 
-    // clouds
     ctx.fillStyle = "rgba(255,255,255,.8)";
     for (const [cx, cy, cr] of [[150, 90, 26], [420, 60, 32], [650, 110, 22]]) {
       ctx.beginPath();
@@ -572,24 +645,20 @@
       ctx.arc(cx - cr * 0.9, cy + 6, cr * 0.7, 0, 7);
       ctx.fill();
     }
-    // hills
     ctx.fillStyle = "#9fd98a";
     ctx.beginPath(); ctx.ellipse(180, GROUND + 30, 280, 70, 0, Math.PI, 0); ctx.fill();
     ctx.beginPath(); ctx.ellipse(620, GROUND + 40, 320, 80, 0, Math.PI, 0); ctx.fill();
 
-    // slingshot back arm
     ctx.strokeStyle = "#7a4a22";
     ctx.lineWidth = 9;
     ctx.beginPath(); ctx.moveTo(SLING.x + 8, SLING.y + 8); ctx.lineTo(SLING.x + 16, GROUND); ctx.stroke();
 
-    // band (back) while aiming
     if (mode === "aim" && bird && dragging) {
       ctx.strokeStyle = "#5a3215";
       ctx.lineWidth = 6;
       ctx.beginPath(); ctx.moveTo(SLING.x + 14, SLING.y); ctx.lineTo(bird.x, bird.y); ctx.stroke();
     }
 
-    // trajectory preview
     if (mode === "aim" && bird && dragging) {
       const vx = (SLING.x - bird.x) * 8.6, vy = (SLING.y - bird.y) * 8.6;
       ctx.fillStyle = "rgba(255,255,255,.75)";
@@ -603,30 +672,24 @@
       }
     }
 
-    // bodies
     for (const b of bodies) {
       if (b.dead) continue;
       if (b.type === "pig") drawPig(b);
       else drawBlock(b);
     }
 
-    // bird
-    if (bird) drawBirdShape(bird.x, bird.y, BIRD_R, true);
-    // waiting birds
-    for (let i = 0; i < birdsLeft; i++) drawBirdShape(48 - i * 26, GROUND - 12, 11, true);
+    if (bird) drawBirdShape(bird.x, bird.y, BIRD_R, mode === "fly" ? bird.spin : 0);
+    for (let i = 0; i < birdsLeft; i++) drawBirdShape(48 - i * 26, GROUND - 12, 11, 0);
 
-    // band (front) while aiming
     if (mode === "aim" && bird && dragging) {
       ctx.strokeStyle = "#7a4a22";
       ctx.lineWidth = 6;
       ctx.beginPath(); ctx.moveTo(SLING.x - 12, SLING.y - 2); ctx.lineTo(bird.x, bird.y); ctx.stroke();
     }
-    // slingshot front arm
     ctx.strokeStyle = "#8a5a2b";
     ctx.lineWidth = 9;
     ctx.beginPath(); ctx.moveTo(SLING.x - 10, SLING.y); ctx.lineTo(SLING.x + 4, SLING.y + 30); ctx.lineTo(SLING.x + 12, GROUND); ctx.stroke();
 
-    // particles
     for (const p of particles) {
       ctx.globalAlpha = Math.max(0, p.life);
       ctx.fillStyle = p.color;
@@ -634,7 +697,6 @@
     }
     ctx.globalAlpha = 1;
 
-    // ground
     ctx.fillStyle = "#6cbf5a";
     ctx.fillRect(-40, GROUND, GW + 80, GH - GROUND + 60);
     ctx.fillStyle = "#4f9842";
@@ -650,7 +712,6 @@
     last = now;
 
     if (mode === "fly" || mode === "aim") {
-      // substep for stability
       const steps = 2;
       for (let s = 0; s < steps; s++) stepPhysics(dt / steps);
 
@@ -658,7 +719,7 @@
         flyTimer += dt;
         if (everythingCalm()) settleTimer += dt; else settleTimer = 0;
         if (settleTimer > 0.7 || flyTimer > 9 || (bird && (bird.x > GW + 40 || bird.x < -40))) {
-          mode = "aim"; // pause physics state label while deciding
+          mode = "aim";
           endTurn();
         } else if (pigsAlive() === 0 && settleTimer > 0.2) {
           mode = "aim";
@@ -676,13 +737,17 @@
     mode = "result";
     if (isWin) { sfx.win(); buzz([50, 40, 50, 40, 120]); }
     else { sfx.lose(); buzz(160); }
-    const stars = isWin ? (birdsLeft >= 2 ? "⭐⭐⭐" : birdsLeft === 1 ? "⭐⭐" : "⭐") : "💔";
-    document.getElementById("starsEl").textContent = stars;
+    const starCount = isWin ? (birdsLeft >= 2 ? 3 : birdsLeft === 1 ? 2 : 1) : 0;
+    document.getElementById("starsEl").textContent = isWin ? "⭐".repeat(starCount) : "💔";
     document.getElementById("resultTitle").textContent = isWin ? "LEVEL CLEARED!" : "PIGGIES SURVIVED!";
     document.getElementById("resultScore").textContent = score;
     const nb = document.getElementById("newBest");
     if (score > best) { best = score; localStorage.setItem(SAVE_KEY, String(best)); nb.classList.remove("hidden"); }
     else nb.classList.add("hidden");
+    // arcade wallet payout
+    const earned = isWin ? starCount * 50 : 10;
+    const bal = walletAdd(earned);
+    document.getElementById("walletLine").textContent = "+🪙 " + earned + " earned · Wallet " + bal.toLocaleString("en-US");
     document.getElementById("nextBtn").textContent = isWin ? "NEXT LEVEL ➜" : "RETRY LEVEL";
     document.getElementById("resultOverlay").classList.remove("hidden");
   }
@@ -715,7 +780,7 @@
     get score() { return score; },
     get level() { return level; },
     get won() { return won; },
-    pigsAlive, launch, buildLevel,
+    pigsAlive, launch, buildLevel, eAABB,
     placeBird(x, y) { if (bird) { bird.x = x; bird.y = y; } },
   };
 })();
