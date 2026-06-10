@@ -79,10 +79,7 @@
     <div class="tag">Tap to flap. Thread the neon gates.<br>Don't touch <b>anything</b>.</div>
     <button class="big-btn" id="startBtn">TAP TO FLY</button>
     <div class="links">
-      <a href="index.html">🎰 Slots</a> ·
-      <a href="runner.html">🏃 Runner</a> ·
-      <a href="stack.html">🏗️ Stack</a> ·
-      <a href="2048.html">🔢 2048</a>
+      <a href="index.html">🏠 All games</a>
     </div>
   </div>
 </div>
@@ -97,10 +94,7 @@
     </div>
     <button class="big-btn" id="retryBtn">FLY AGAIN</button>
     <div class="links">
-      <a href="index.html">🎰 Slots</a> ·
-      <a href="runner.html">🏃 Runner</a> ·
-      <a href="stack.html">🏗️ Stack</a> ·
-      <a href="2048.html">🔢 2048</a>
+      <a href="index.html">🏠 All games</a>
     </div>
   </div>
 </div>
@@ -146,6 +140,38 @@
   };
   const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
 
+  /* ---- background music ---- */
+  const MUSIC_BASS = [147, 0, 147, 0, 175, 0, 165, 0];
+  const MUSIC_LEAD = [587, 0, 659, 698, 0, 784, 0, 659, 587, 0, 523, 0, 587, 0, 0, 0];
+  const MUSIC_SPB = 0.14;
+  let mStep = 0, mNext = 0, mTimer = null;
+  function mNote(f, dur, type, vol, when) {
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function startMusic() {
+    ensureAudio();
+    if (mTimer || !actx) return;
+    mStep = 0; mNext = actx.currentTime + 0.1;
+    mTimer = setInterval(() => {
+      if (!actx) return;
+      while (mNext < actx.currentTime + 0.35) {
+        const w = Math.max(0, mNext - actx.currentTime);
+        const b = MUSIC_BASS[mStep % MUSIC_BASS.length];
+        const l = MUSIC_LEAD[mStep % MUSIC_LEAD.length];
+        if (b) mNote(b, 0.2, "triangle", 0.032, w);
+        if (l) mNote(l, 0.12, "square", 0.012, w);
+        mStep++; mNext += MUSIC_SPB;
+      }
+    }, 100);
+  }
+
+
   /* ---- state ---- */
   const SAVE_KEY = "glowBirdBest_v1";
   /* ---- shared arcade wallet ---- */
@@ -177,6 +203,7 @@
 
   function startGame() {
     ensureAudio();
+    startMusic();
     bird = { y: H * 0.45, vy: 0 };
     pipes = [];
     trail = [];

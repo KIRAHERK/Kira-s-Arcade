@@ -93,10 +93,7 @@
     Land it dead-center for a <b>PERFECT</b> — streaks grow your block back. How high can you go?</div>
     <button class="big-btn" id="startBtn">TAP TO BUILD</button>
     <div class="links">
-      <a href="index.html">🎰 Slots</a> ·
-      <a href="runner.html">🏃 Runner</a> ·
-      <a href="candy.html">🍬 Candy</a> ·
-      <a href="blackjack.html">🃏 Blackjack</a>
+      <a href="index.html">🏠 All games</a>
     </div>
   </div>
 </div>
@@ -112,10 +109,7 @@
     </div>
     <button class="big-btn" id="retryBtn">BUILD AGAIN</button>
     <div class="links">
-      <a href="index.html">🎰 Slots</a> ·
-      <a href="runner.html">🏃 Runner</a> ·
-      <a href="candy.html">🍬 Candy</a> ·
-      <a href="blackjack.html">🃏 Blackjack</a>
+      <a href="index.html">🏠 All games</a>
     </div>
   </div>
 </div>
@@ -162,6 +156,38 @@
   };
   const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
 
+  /* ---- background music ---- */
+  const MUSIC_BASS = [98, 0, 0, 123, 0, 0, 110, 0];
+  const MUSIC_LEAD = [392, 0, 440, 0, 494, 0, 440, 0, 392, 0, 330, 0, 294, 0, 330, 0];
+  const MUSIC_SPB = 0.22;
+  let mStep = 0, mNext = 0, mTimer = null;
+  function mNote(f, dur, type, vol, when) {
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function startMusic() {
+    ensureAudio();
+    if (mTimer || !actx) return;
+    mStep = 0; mNext = actx.currentTime + 0.1;
+    mTimer = setInterval(() => {
+      if (!actx) return;
+      while (mNext < actx.currentTime + 0.35) {
+        const w = Math.max(0, mNext - actx.currentTime);
+        const b = MUSIC_BASS[mStep % MUSIC_BASS.length];
+        const l = MUSIC_LEAD[mStep % MUSIC_LEAD.length];
+        if (b) mNote(b, 0.2, "triangle", 0.032, w);
+        if (l) mNote(l, 0.12, "square", 0.012, w);
+        mStep++; mNext += MUSIC_SPB;
+      }
+    }, 100);
+  }
+
+
   /* ---- state ---- */
   const SAVE_KEY = "skyStackBest_v1";
   /* ---- shared arcade wallet ---- */
@@ -194,6 +220,7 @@
   function baseW() { return Math.min(W * 0.66, 280); }
   function startGame() {
     ensureAudio();
+    startMusic();
     blocks = [{ x: (W - baseW()) / 2, w: baseW(), hue: 200 }];
     pieces = [];
     camY = 0; score = 0; perfects = 0; streak = 0; shake = 0;
