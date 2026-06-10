@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0e0e14">
+<title>Mafia 🕵️</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+  body {
+    min-height: 100%;
+    font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(120% 100% at 50% 0%, #1d1d2b 0%, #0e0e14 60%, #060609 100%);
+    background-attachment: fixed;
+    color: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+  .logo {
+    font-size: 30px; font-weight: 900; letter-spacing: 2px; margin-top: 4px;
+    background: linear-gradient(180deg, #ffe9e9, #ff5d73 55%, #a31226);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 26px rgba(255, 93, 115, .25);
+  }
+  .sub { font-size: 12.5px; opacity: .6; margin: 4px 0 16px; text-align: center; line-height: 1.5; }
+  #app { width: min(94vw, 420px); display: flex; flex-direction: column; gap: 12px; }
+
+  .box {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 18px;
+    padding: 18px 16px;
+  }
+  .box h2 { font-size: 13px; letter-spacing: 2px; opacity: .65; margin-bottom: 12px; font-weight: 700; }
+  input {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.25);
+    background: rgba(0,0,0,.35);
+    color: #fff;
+    font-size: 17px;
+    font-weight: 600;
+    text-align: center;
+    outline: none;
+    margin-bottom: 10px;
+  }
+  input::placeholder { color: rgba(255,255,255,.35); }
+  .btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 14px;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #fff;
+    background: linear-gradient(180deg, #ff7a8c, #ff5d73 55%, #c22941);
+    box-shadow: 0 5px 0 #6e0f1f;
+  }
+  .btn.alt { background: linear-gradient(180deg, #9be8c0, #3ddc84 55%, #1f9c5b); box-shadow: 0 5px 0 #11603a; color: #06250f; }
+  .btn.ghost { background: rgba(255,255,255,.1); box-shadow: none; border: 1px solid rgba(255,255,255,.25); font-size: 14px; padding: 11px; }
+  .btn:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+  .btn:disabled { filter: grayscale(.8) brightness(.55); }
+  .btn + .btn { margin-top: 10px; }
+
+  .code-big {
+    font-size: 44px; font-weight: 900; letter-spacing: 12px;
+    text-align: center; color: #ffd166;
+    text-shadow: 0 0 22px rgba(255,209,102,.5);
+    margin: 6px 0 2px;
+  }
+  .code-hint { text-align: center; font-size: 12px; opacity: .6; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip {
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .chip.me { border-color: #ffd166; color: #ffd166; }
+  .chip.dead { opacity: .4; text-decoration: line-through; }
+
+  .rolecard {
+    text-align: center;
+    border-radius: 18px;
+    padding: 26px 16px;
+    border: 2px solid;
+    animation: pop .4s cubic-bezier(.3,1.5,.5,1);
+  }
+  @keyframes pop { 0% { transform: scale(.6) rotateY(70deg); opacity: 0; } 100% { transform: scale(1) rotateY(0); opacity: 1; } }
+  .rolecard .emoji { font-size: 64px; display: block; margin-bottom: 8px; }
+  .rolecard .rname { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+  .rolecard .rdesc { font-size: 13.5px; opacity: .85; margin-top: 8px; line-height: 1.6; }
+  .r-mafia { background: rgba(194, 41, 65, .18); border-color: #ff5d73; color: #ffaeb9; }
+  .r-detective { background: rgba(77, 195, 255, .14); border-color: #4dc3ff; color: #bfe7ff; }
+  .r-doctor { background: rgba(61, 220, 132, .14); border-color: #3ddc84; color: #c4f5d9; }
+  .r-civilian { background: rgba(255, 209, 102, .12); border-color: #ffd166; color: #ffe9b8; }
+
+  .phase-banner {
+    text-align: center;
+    font-size: 21px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(0,0,0,.4);
+    border: 1px solid rgba(255,255,255,.15);
+    line-height: 1.5;
+  }
+  .phase-banner small { display: block; font-size: 12.5px; font-weight: 600; opacity: .7; letter-spacing: 0; margin-top: 4px; }
+  .pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pick {
+    padding: 16px 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.25);
+    background: rgba(255,255,255,.08);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+  }
+  .pick:active { transform: scale(.95); background: rgba(255,255,255,.18); }
+  .pick.skip { grid-column: 1 / -1; opacity: .75; }
+  .tally { font-size: 15px; line-height: 2; }
+  .tally b { color: #ffd166; }
+  .dead-note { text-align: center; font-size: 40px; }
+  .roles-list { font-size: 14.5px; line-height: 2.1; }
+  .roles-list .m { color: #ff5d73; font-weight: 800; }
+  .waiting { text-align: center; font-size: 14px; opacity: .7; padding: 8px; }
+  .pulse { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .links { margin-top: 14px; font-size: 13px; text-align: center; }
+  .links a { color: rgba(255,255,255,.65); text-decoration: underline; }
+  .err { color: #ff8a8a; font-size: 13px; text-align: center; min-height: 18px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="logo">🕵️ MAFIA</div>
+<div class="sub">the classic party game of lying to your friends<br>one phone each · same room · no accounts</div>
+<div id="app"></div>
+<div class="links"><a href="index.html">🏠 All games</a></div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* =====================================================
+     GAME ENGINE (host-side, transport-agnostic, testable)
+     ===================================================== */
+  function createEngine(send) {
+    // send(playerId, msg) delivers a message to one player ("host" included)
+    const E = {
+      players: [],          // {id, name, role, alive, gone}
+      phase: "lobby",       // lobby | night | announce | vote | over
+      round: 0,
+      winner: null,
+      night: null,          // {kills:{mafiaName:target}, save, saveDone, check, checkDone}
+      votes: null,          // {voterName: targetName|"skip"}
+      lastDeath: null,
+    };
+
+    const alive = () => E.players.filter((p) => p.alive && !p.gone);
+    const aliveNames = () => alive().map((p) => p.name);
+    const byName = (n) => E.players.find((p) => p.name === n);
+    const mafias = () => alive().filter((p) => p.role === "mafia");
+    const roleOf = (r) => alive().find((p) => p.role === r) || null;
+    const bcast = (msg) => { for (const p of E.players) if (!p.gone) send(p.id, msg); };
+
+    function rolesFor(n) {
+      const mafia = Math.max(1, Math.floor(n / 3));
+      const roles = [];
+      for (let i = 0; i < mafia; i++) roles.push("mafia");
+      roles.push("detective");
+      if (n >= 5) roles.push("doctor");
+      while (roles.length < n) roles.push("civilian");
+      return roles;
+    }
+
+    function shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    E.addPlayer = (id, name) => {
+      if (E.phase !== "lobby" || E.players.length >= 12) return false;
+      let n = (name || "Player").trim().slice(0, 14) || "Player";
+      let base = n, k = 2;
+      while (E.players.some((p) => p.name === n)) n = base + " " + k++;
+      E.players.push({ id, name: n, role: null, alive: true, gone: false });
+      sendLobby();
+      return n;
+    };
+    E.removePlayer = (id) => {
+      const p = E.players.find((x) => x.id === id);
+      if (!p) return;
+      if (E.phase === "lobby") E.players = E.players.filter((x) => x.id !== id);
+      else p.gone = true;
+      sendLobby();
+    };
+    function sendLobby() {
+      if (E.phase !== "lobby") return;
+      bcast({ t: "lobby", players: E.players.map((p) => p.name), canStart: E.players.length >= 4 });
+    }
+    E.sendLobby = sendLobby;
+
+    E.start = () => {
+      if (E.phase !== "lobby" || E.players.length < 4) return false;
+      const roles = shuffle(rolesFor(E.players.length));
+      E.players.forEach((p, i) => { p.role = roles[i]; p.alive = true; });
+      const mafiaNames = E.players.filter((p) => p.role === "mafia").map((p) => p.name);
+      for (const p of E.players) {
+        if (p.gone) continue;
+        send(p.id, {
+          t: "role",
+          role: p.role,
+          mates: p.role === "mafia" ? mafiaNames.filter((m) => m !== p.name) : [],
+          mafiaCount: mafiaNames.length,
+          players: E.players.map((x) => x.name),
+        });
+      }
+      E.round = 0;
+      E.winner = null;
+      beginNight();
+      return true;
+    };
+
+    function beginNight() {
+      E.phase = "night";
+      E.round++;
+      E.night = { kills: {}, save: null, saveDone: false, check: null, checkDone: false };
+      for (const p of E.players) {
+        if (p.gone) continue;
+        let turn = null, options = [];
+        if (p.alive) {
+          if (p.role === "mafia") { turn = "kill"; options = aliveNames().filter((n) => byName(n).role !== "mafia"); }
+          else if (p.role === "doctor") { turn = "save"; options = aliveNames(); }
+          else if (p.role === "detective") { turn = "check"; options = aliveNames().filter((n) => n !== p.name); }
+        }
+        send(p.id, { t: "night", round: E.round, yourTurn: turn, options, alive: aliveNames() });
+      }
+      checkNightDone();   // handles e.g. all specials dead edge cases
+    }
+
+    E.action = (id, kind, target) => {
+      if (E.phase !== "night") return;
+      const p = E.players.find((x) => x.id === id);
+      if (!p || !p.alive) return;
+      if (kind === "kill" && p.role === "mafia" && !E.night.kills[p.name]) {
+        const t = byName(target);
+        if (!t || !t.alive || t.role === "mafia") return;
+        E.night.kills[p.name] = target;
+        send(p.id, { t: "waiting", msg: "Target locked. Waiting for the night to end…" });
+      } else if (kind === "save" && p.role === "doctor" && !E.night.saveDone) {
+        if (!byName(target) || !byName(target).alive) return;
+        E.night.save = target;
+        E.night.saveDone = true;
+        send(p.id, { t: "waiting", msg: "Patient chosen. Waiting for the night to end…" });
+      } else if (kind === "check" && p.role === "detective" && !E.night.checkDone) {
+        const t = byName(target);
+        if (!t || !t.alive || t === p) return;
+        E.night.check = target;
+        E.night.checkDone = true;
+        send(p.id, { t: "checkResult", name: target, isMafia: t.role === "mafia" });
+      } else return;
+      checkNightDone();
+    };
+
+    function checkNightDone() {
+      const needKills = mafias().some((m) => !E.night.kills[m.name]);
+      const doc = roleOf("doctor"), det = roleOf("detective");
+      if (needKills || (doc && !E.night.saveDone) || (det && !E.night.checkDone)) return;
+      resolveNight();
+    }
+
+    E.forceNight = () => {   // host safety: fill missing actions randomly
+      if (E.phase !== "night") return;
+      for (const m of mafias()) {
+        if (!E.night.kills[m.name]) {
+          const opts = aliveNames().filter((n) => byName(n).role !== "mafia");
+          E.night.kills[m.name] = opts[Math.floor(Math.random() * opts.length)];
+        }
+      }
+      E.night.saveDone = true;
+      E.night.checkDone = true;
+      resolveNight();
+    };
+
+    function resolveNight() {
+      // victim = most-picked target among mafia (random among ties)
+      const tally = {};
+      for (const k of Object.values(E.night.kills)) tally[k] = (tally[k] || 0) + 1;
+      let victim = null;
+      const entries = Object.entries(tally);
+      if (entries.length) {
+        const max = Math.max(...entries.map(([, c]) => c));
+        const top = entries.filter(([, c]) => c === max).map(([n]) => n);
+        victim = top[Math.floor(Math.random() * top.length)];
+      }
+      let died = null;
+      if (victim && victim !== E.night.save) {
+        const v = byName(victim);
+        v.alive = false;
+        died = victim;
+        send(v.id, { t: "youDead", how: "killed" });
+      }
+      E.lastDeath = died;
+      E.phase = "announce";
+      bcast({
+        t: "announce",
+        round: E.round,
+        died,
+        saved: !!(victim && victim === E.night.save),
+        alive: aliveNames(),
+        deadRoles: deadRoles(),
+      });
+      checkWin();
+    }
+
+    function deadRoles() {
+      return E.players.filter((p) => !p.alive).map((p) => ({ name: p.name, role: p.role }));
+    }
+
+    E.openVote = () => {           // host taps "start vote" after discussion
+      if (E.phase !== "announce") return;
+      E.phase = "vote";
+      E.votes = {};
+      for (const p of E.players) {
+        if (p.gone) continue;
+        send(p.id, { t: "voteOpen", options: p.alive ? aliveNames().filter((n) => n !== p.name) : [], alive: aliveNames() });
+      }
+    };
+
+    E.vote = (id, target) => {
+      if (E.phase !== "vote") return;
+      const p = E.players.find((x) => x.id === id);
+      if (!p || !p.alive || E.votes[p.name]) return;
+      if (target !== "skip" && (!byName(target) || !byName(target).alive)) return;
+      E.votes[p.name] = target;
+      send(p.id, { t: "waiting", msg: "Vote cast. Waiting for the others…" });
+      if (alive().every((q) => E.votes[q.name])) resolveVotes();
+    };
+
+    E.forceVote = () => {          // host safety: missing votes become skips
+      if (E.phase !== "vote") return;
+      for (const p of alive()) if (!E.votes[p.name]) E.votes[p.name] = "skip";
+      resolveVotes();
+    };
+
+    function resolveVotes() {
+      const tally = {};
+      for (const t of Object.values(E.votes)) if (t !== "skip") tally[t] = (tally[t] || 0) + 1;
+      let eliminated = null;
+      const entries = Object.entries(tally);
+      if (entries.length) {
+        const max = Math.max(...entries.map(([, c]) => c));
+        const top = entries.filter(([, c]) => c === max).map(([n]) => n);
+        if (top.length === 1) eliminated = top[0];   // ties spare everyone
+      }
+      let role = null;
+      if (eliminated) {
+        const p = byName(eliminated);
+        p.alive = false;
+        role = p.role;
+        send(p.id, { t: "youDead", how: "voted" });
+      }
+      E.phase = "announce";
+      bcast({ t: "voteResult", tally, eliminated, role, alive: aliveNames(), deadRoles: deadRoles() });
+      checkWin();
+    }
+
+    E.nextNight = () => {          // host taps to continue after vote result
+      if (E.phase !== "announce" || E.winner) return;
+      beginNight();
+    };
+
+    function checkWin() {
+      const m = mafias().length;
+      const others = alive().length - m;
+      let winner = null;
+      if (m === 0) winner = "town";
+      else if (m >= others) winner = "mafia";
+      if (winner) {
+        E.winner = winner;
+        E.phase = "over";
+        bcast({ t: "over", winner, roles: E.players.map((p) => ({ name: p.name, role: p.role, alive: p.alive })) });
+      }
+    }
+
+    E.playAgain = () => {
+      if (E.phase !== "over") return;
+      E.phase = "lobby";
+      E.players = E.players.filter((p) => !p.gone);
+      for (const p of E.players) { p.role = null; p.alive = true; }
+      sendLobby();
+    };
+
+    return E;
+  }
+
+  // exposed for headless testing
+  window.__mafiaEngine = createEngine;
+
+  /* =====================================================
+     CLIENT UI (every phone, host included)
+     ===================================================== */
+  const app = document.getElementById("app");
+  const ROLE_ART = {
+    mafia: { emoji: "🔪", name: "MAFIA", cls: "r-mafia", desc: "Blend in by day. Kill by night.<br>Lie. Deflect. Survive." },
+    detective: { emoji: "🕵️", name: "DETECTIVE", cls: "r-detective", desc: "Each night, investigate one player<br>and learn if they are Mafia." },
+    doctor: { emoji: "🩺", name: "DOCTOR", cls: "r-doctor", desc: "Each night, protect one player<br>(even yourself) from the Mafia." },
+    civilian: { emoji: "🧑‍🌾", name: "CIVILIAN", cls: "r-civilian", desc: "No powers — just your wits.<br>Find the Mafia and vote them out." },
+  };
+
+  let peer = null, hostConns = {}, clientConn = null;
+  let isHost = false, myName = "", myRole = null, iAmDead = false;
+  let engine = null;
+  let lastMsg = null;
+  let roleSeen = false;
+
+  function h(html) { app.innerHTML = html; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  /* ---- networking ---- */
+  const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  function makeCode() {
+    let c = "";
+    for (let i = 0; i < 4; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return c;
+  }
+  const peerId = (code) => "kira-mafia-" + code.toLowerCase();
+
+  function hostGame(name) {
+    const code = makeCode();
+    myName = name;
+    isHost = true;
+    showWait("Setting up your room…");
+    peer = new Peer(peerId(code));
+    peer.on("open", () => {
+      engine = createEngine((pid, msg) => {
+        if (pid === "host") handleMsg(msg);
+        else if (hostConns[pid]) try { hostConns[pid].send(msg); } catch (e) {}
+      });
+      engine.code = code;
+      myName = engine.addPlayer("host", name);
+      peer.on("connection", (conn) => {
+        conn.on("data", (msg) => {
+          if (!msg || typeof msg !== "object") return;
+          if (msg.t === "join") {
+            hostConns[conn.peer] = conn;
+            engine.addPlayer(conn.peer, msg.name);
+          } else if (msg.t === "action") engine.action(conn.peer, msg.kind, msg.target);
+          else if (msg.t === "vote") engine.vote(conn.peer, msg.target);
+        });
+        conn.on("close", () => { delete hostConns[conn.peer]; engine.removePlayer(conn.peer); });
+      });
+      engine.sendLobby();
+    });
+    peer.on("error", (e) => showHome("Couldn't create room (" + e.type + "). Try again."));
+  }
+
+  function joinGame(code, name) {
+    myName = name;
+    isHost = false;
+    showWait("Joining room " + code.toUpperCase() + "…");
+    peer = new Peer();
+    peer.on("open", () => {
+      clientConn = peer.connect(peerId(code), { reliable: true });
+      let opened = false;
+      clientConn.on("open", () => { opened = true; clientConn.send({ t: "join", name }); });
+      clientConn.on("data", (msg) => handleMsg(msg));
+      clientConn.on("close", () => showHome("Connection lost. Rejoin with the room code."));
+      setTimeout(() => { if (!opened) showHome("Room not found — check the code."); }, 8000);
+    });
+    peer.on("error", (e) => {
+      if (e.type === "peer-unavailable") showHome("Room not found — check the code.");
+      else showHome("Connection error (" + e.type + ").");
+    });
+  }
+
+  const toHost = (msg) => {
+    if (isHost) {
+      if (msg.t === "action") engine.action("host", msg.kind, msg.target);
+      else if (msg.t === "vote") engine.vote("host", msg.target);
+    } else if (clientConn) clientConn.send(msg);
+  };
+
+  /* ---- message handling / rendering ---- */
+  function handleMsg(msg) {
+    lastMsg = msg;
+    if (msg.t === "lobby") { iAmDead = false; myRole = null; roleSeen = false; renderLobby(msg); }
+    else if (msg.t === "role") { myRole = msg; roleSeen = false; renderRole(msg); }
+    else if (msg.t === "night") renderNight(msg);
+    else if (msg.t === "checkResult") renderCheckResult(msg);
+    else if (msg.t === "waiting") renderWaiting(msg.msg);
+    else if (msg.t === "announce") renderAnnounce(msg);
+    else if (msg.t === "voteOpen") renderVote(msg);
+    else if (msg.t === "voteResult") renderVoteResult(msg);
+    else if (msg.t === "youDead") { iAmDead = true; }
+    else if (msg.t === "over") renderOver(msg);
+  }
+
+  function hostBtn(label, fn, extra) {
+    const id = "hb" + Math.random().toString(36).slice(2, 8);
+    setTimeout(() => { const el = document.getElementById(id); if (el) el.onclick = fn; }, 0);
+    return `<button class="btn ${extra || ""}" id="${id}">${label}</button>`;
+  }
+
+  function showHome(err) {
+    h(`
+      <div class="box">
+        <h2>YOUR NAME</h2>
+        <input id="nameIn" maxlength="14" placeholder="e.g. Kira" autocomplete="off">
+        <div class="err">${err ? esc(err) : ""}</div>
+        ${hostBtn("HOST A GAME", () => {
+          const n = document.getElementById("nameIn").value.trim();
+          if (!n) return showHome("Enter a name first!");
+          if (typeof Peer === "undefined") return showHome("Couldn't load the network library — check your internet.");
+          hostGame(n);
+        })}
+      </div>
+      <div class="box">
+        <h2>OR JOIN A ROOM</h2>
+        <input id="codeIn" maxlength="4" placeholder="CODE" style="letter-spacing:8px;text-transform:uppercase" autocomplete="off">
+        ${hostBtn("JOIN", () => {
+          const n = document.getElementById("nameIn").value.trim();
+          const c = document.getElementById("codeIn").value.trim();
+          if (!n) return showHome("Enter a name first!");
+          if (c.length !== 4) return showHome("Room codes are 4 letters.");
+          if (typeof Peer === "undefined") return showHome("Couldn't load the network library — check your internet.");
+          joinGame(c, n);
+        }, "alt")}
+      </div>
+      <div class="sub">4–12 players · everyone opens this page<br>works anywhere — same room or on the go</div>
+    `);
+  }
+
+  function showWait(text) {
+    h(`<div class="box waiting pulse">${esc(text)}</div>`);
+  }
+
+  function renderLobby(msg) {
+    h(`
+      ${isHost ? `<div class="box" style="text-align:center">
+        <h2>ROOM CODE — tell your friends</h2>
+        <div class="code-big">${engine.code}</div>
+        <div class="code-hint">they open this page → JOIN → type the code</div>
+      </div>` : ""}
+      <div class="box">
+        <h2>PLAYERS (${msg.players.length})</h2>
+        <div class="chips">${msg.players.map((p) => `<span class="chip ${p === myName ? "me" : ""}">${esc(p)}</span>`).join("")}</div>
+      </div>
+      ${isHost
+        ? (msg.canStart
+            ? hostBtn("START GAME 🔪", () => engine.start())
+            : `<div class="waiting pulse">need at least 4 players…</div>`)
+        : `<div class="waiting pulse">waiting for the host to start…</div>`}
+    `);
+  }
+
+  function renderRole(msg) {
+    const art = ROLE_ART[msg.role];
+    h(`
+      <div class="box" style="text-align:center">
+        <h2>YOUR SECRET ROLE — don't show anyone!</h2>
+        ${roleSeen ? `
+          <div class="rolecard ${art.cls}">
+            <span class="emoji">${art.emoji}</span>
+            <div class="rname">${art.name}</div>
+            <div class="rdesc">${art.desc}</div>
+            ${msg.mates.length ? `<div class="rdesc">Your partner${msg.mates.length > 1 ? "s" : ""}: <b>${msg.mates.map(esc).join(", ")}</b></div>` : ""}
+            <div class="rdesc" style="opacity:.6">There ${msg.mafiaCount > 1 ? "are" : "is"} ${msg.mafiaCount} Mafia among ${msg.players.length} players.</div>
+          </div>` : ""}
+        ${hostBtn(roleSeen ? "HIDE & CONTINUE ➜" : "👁️ TAP TO REVEAL", () => {
+          if (!roleSeen) { roleSeen = true; renderRole(msg); }
+          else if (lastMsg && lastMsg.t === "night") renderNight(lastMsg);
+          else showWait("Night is falling…");
+        })}
+      </div>
+    `);
+  }
+
+  function pickGrid(options, kind) {
+    const btns = options.map((n) => {
+      const id = "pk" + Math.random().toString(36).slice(2, 8);
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.onclick = () => toHost(kind === "vote" ? { t: "vote", target: n } : { t: "action", kind, target: n });
+      }, 0);
+      return `<button class="pick" id="${id}">${esc(n)}</button>`;
+    }).join("");
+    let skip = "";
+    if (kind === "vote") {
+      const sid = "pkskip";
+      setTimeout(() => { const el = document.getElementById(sid); if (el) el.onclick = () => toHost({ t: "vote", target: "skip" }); }, 0);
+      skip = `<button class="pick skip" id="${sid}">🤷 Skip — vote no one</button>`;
+    }
+    return `<div class="pick-grid">${btns}${skip}</div>`;
+  }
+
+  function hostControls(phase) {
+    if (!isHost) return "";
+    if (phase === "night") return hostBtn("⏭ force end night (stuck?)", () => engine.forceNight(), "ghost");
+    if (phase === "vote") return hostBtn("⏭ force end vote (stuck?)", () => engine.forceVote(), "ghost");
+    return "";
+  }
+
+  function renderNight(msg) {
+    if (myRole && !roleSeen) { renderRole(myRole); return; }
+    const head = `<div class="phase-banner">🌙 NIGHT ${msg.round}<small>everyone: heads down, no peeking at phones nearby</small></div>`;
+    if (iAmDead) { h(head + deadBox()); return; }
+    if (msg.yourTurn === "kill") {
+      h(head + `<div class="box"><h2>🔪 PICK TONIGHT'S VICTIM</h2>${pickGrid(msg.options, "kill")}</div>` + hostControls("night"));
+    } else if (msg.yourTurn === "save") {
+      h(head + `<div class="box"><h2>🩺 WHO DO YOU PROTECT?</h2>${pickGrid(msg.options, "save")}</div>` + hostControls("night"));
+    } else if (msg.yourTurn === "check") {
+      h(head + `<div class="box"><h2>🕵️ WHO DO YOU INVESTIGATE?</h2>${pickGrid(msg.options, "check")}</div>` + hostControls("night"));
+    } else {
+      h(head + `<div class="box waiting pulse">😴 The town sleeps. Keep a straight face…</div>` + hostControls("night"));
+    }
+  }
+
+  function renderCheckResult(msg) {
+    h(`
+      <div class="phase-banner">🌙 NIGHT</div>
+      <div class="box" style="text-align:center">
+        <h2>INVESTIGATION RESULT</h2>
+        <div style="font-size:42px;margin:6px 0">${msg.isMafia ? "🔪" : "✅"}</div>
+        <div style="font-size:18px;font-weight:800">${esc(msg.name)} ${msg.isMafia ? "IS MAFIA!" : "is not Mafia."}</div>
+        <div class="waiting pulse" style="margin-top:10px">remember it. tell no one… or do 😏</div>
+      </div>
+    `);
+  }
+
+  function renderWaiting(text) {
+    h(`<div class="box waiting pulse">${esc(text)}</div>` + hostControls(isHost && engine ? engine.phase : ""));
+  }
+
+  function deadBox() {
+    return `<div class="box" style="text-align:center"><div class="dead-note">👻</div>
+      <div style="font-weight:800;margin-top:4px">You're dead — no talking!</div>
+      <div class="waiting">enjoy watching them get it all wrong</div></div>`;
+  }
+
+  function renderAnnounce(msg) {
+    const head = `<div class="phase-banner">☀️ DAY ${msg.round}</div>`;
+    const news = msg.died
+      ? `<div class="box" style="text-align:center"><div style="font-size:42px">☠️</div>
+         <div style="font-size:19px;font-weight:900;margin-top:4px">${esc(msg.died)} was killed in the night</div></div>`
+      : `<div class="box" style="text-align:center"><div style="font-size:42px">🛡️</div>
+         <div style="font-size:19px;font-weight:900;margin-top:4px">${msg.saved ? "The doctor saved a life — nobody died!" : "A quiet night — nobody died."}</div></div>`;
+    const talk = `<div class="box waiting">🗣️ Discuss out loud: who's acting shady?</div>`;
+    const ctl = isHost ? hostBtn("OPEN THE VOTE 🗳️", () => engine.openVote()) : `<div class="waiting pulse">host opens the vote when you're done arguing</div>`;
+    h(head + news + (iAmDead ? deadBox() : talk) + ctl);
+  }
+
+  function renderVote(msg) {
+    const head = `<div class="phase-banner">🗳️ VOTE<small>who hangs today?</small></div>`;
+    if (iAmDead || !msg.options.length) { h(head + deadBox() + hostControls("vote")); return; }
+    h(head + `<div class="box"><h2>CAST YOUR VOTE</h2>${pickGrid(msg.options, "vote")}</div>` + hostControls("vote"));
+  }
+
+  function renderVoteResult(msg) {
+    const tally = Object.entries(msg.tally).sort((a, b) => b[1] - a[1]);
+    const rows = tally.length
+      ? tally.map(([n, c]) => `${esc(n)} — <b>${c} vote${c > 1 ? "s" : ""}</b>`).join("<br>")
+      : "everyone skipped";
+    const verdict = msg.eliminated
+      ? `<div style="font-size:19px;font-weight:900;margin-top:10px">⚖️ ${esc(msg.eliminated)} was voted out<br>
+         <span style="font-size:15px">they were ${ROLE_ART[msg.role].emoji} <b>${ROLE_ART[msg.role].name}</b></span></div>`
+      : `<div style="font-size:17px;font-weight:800;margin-top:10px">🤝 Tie — nobody was eliminated</div>`;
+    const ctl = isHost ? hostBtn("NIGHT FALLS 🌙", () => engine.nextNight()) : `<div class="waiting pulse">waiting for the host…</div>`;
+    h(`
+      <div class="phase-banner">🗳️ THE VERDICT</div>
+      <div class="box" style="text-align:center"><div class="tally">${rows}</div>${verdict}</div>
+      ${iAmDead ? deadBox() : ""}
+      ${ctl}
+    `);
+  }
+
+  function renderOver(msg) {
+    const townWin = msg.winner === "town";
+    const list = msg.roles.map((r) =>
+      `<div>${r.alive ? "🙂" : "💀"} ${esc(r.name)} — <span class="${r.role === "mafia" ? "m" : ""}">${ROLE_ART[r.role].emoji} ${ROLE_ART[r.role].name}</span></div>`
+    ).join("");
+    const ctl = isHost ? hostBtn("PLAY AGAIN 🔁", () => engine.playAgain()) : `<div class="waiting pulse">host can start a rematch…</div>`;
+    h(`
+      <div class="phase-banner">${townWin ? "🎉 TOWN WINS!" : "🔪 MAFIA WINS!"}<small>${townWin ? "every last mafioso is gone" : "the town never saw it coming"}</small></div>
+      <div class="box"><h2>WHO WAS WHO</h2><div class="roles-list">${list}</div></div>
+      ${ctl}
+    `);
+  }
+
+  showHome();
+})();
+</script>
+</body>
+</html>
