@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0c1224">
+<title>Reflex Royale ⚡</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+  body {
+    min-height: 100%;
+    font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(120% 100% at 50% 0%, #14224a 0%, #0c1224 60%, #05080f 100%);
+    background-attachment: fixed;
+    color: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+  .logo {
+    font-size: 30px; font-weight: 900; letter-spacing: 2px; margin-top: 4px;
+    background: linear-gradient(180deg, #fffbe0, #ffd54a 45%, #ff8c5c);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 26px rgba(255, 213, 74, .3);
+  }
+  .sub { font-size: 12.5px; opacity: .6; margin: 4px 0 16px; text-align: center; line-height: 1.5; }
+  #app { width: min(94vw, 420px); display: flex; flex-direction: column; gap: 12px; }
+
+  .box {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 18px;
+    padding: 18px 16px;
+  }
+  .box h2 { font-size: 13px; letter-spacing: 2px; opacity: .65; margin-bottom: 12px; font-weight: 700; }
+  input {
+    width: 100%; padding: 14px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.25);
+    background: rgba(0,0,0,.35); color: #fff;
+    font-size: 17px; font-weight: 600; text-align: center;
+    outline: none; margin-bottom: 10px;
+  }
+  input::placeholder { color: rgba(255,255,255,.35); }
+  .btn {
+    width: 100%; padding: 15px; border: none; border-radius: 14px;
+    font-size: 17px; font-weight: 800; letter-spacing: 1.5px;
+    color: #2a1300;
+    background: linear-gradient(180deg, #ffe27a, #ffd54a 55%, #e0a92b);
+    box-shadow: 0 5px 0 #8a6510;
+  }
+  .btn.alt { background: linear-gradient(180deg, #9be8c0, #3ddc84 55%, #1f9c5b); box-shadow: 0 5px 0 #11603a; color: #06250f; }
+  .btn.ghost { background: rgba(255,255,255,.1); box-shadow: none; border: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 14px; padding: 11px; }
+  .btn:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+  .btn + .btn { margin-top: 10px; }
+
+  .code-big {
+    font-size: 44px; font-weight: 900; letter-spacing: 12px;
+    text-align: center; color: #4dc3ff;
+    text-shadow: 0 0 22px rgba(77,195,255,.5);
+    margin: 6px 0 2px;
+  }
+  .code-hint { text-align: center; font-size: 12px; opacity: .6; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip {
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 14px; font-weight: 700;
+  }
+  .chip.me { border-color: #ffd54a; color: #ffd54a; }
+
+  .round-head {
+    text-align: center;
+    font-size: 13px; letter-spacing: 2px; font-weight: 800; opacity: .7;
+  }
+  .round-title {
+    text-align: center;
+    font-size: 24px; font-weight: 900; letter-spacing: 1px;
+    margin-top: 2px;
+  }
+  .round-desc { text-align: center; font-size: 13.5px; opacity: .75; margin-top: 4px; }
+
+  .arena {
+    border-radius: 18px;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 18px 14px;
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(0,0,0,.35);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .arena.red { background: #7a1d2a; border-color: #ff5d73; }
+  .arena.green { background: #0f7a44; border-color: #3ddc84; }
+  .countdown { font-size: 84px; font-weight: 900; text-shadow: 0 0 30px rgba(255,213,74,.6); }
+  .bigword { font-size: 38px; font-weight: 900; letter-spacing: 2px; }
+  .timer-ms { font-size: 30px; font-weight: 900; color: #ffd54a; }
+  .mash-count { font-size: 72px; font-weight: 900; color: #ffd54a; text-shadow: 0 0 24px rgba(255,213,74,.5); }
+  .mash-btn {
+    width: 170px; height: 170px; border-radius: 50%;
+    border: none;
+    font-size: 26px; font-weight: 900; color: #2a1300;
+    background: radial-gradient(circle at 35% 30%, #ffe27a, #ffd54a 60%, #d6952b);
+    box-shadow: 0 8px 0 #8a6510, 0 0 40px rgba(255,213,74,.4);
+  }
+  .mash-btn:active { transform: scale(.93); box-shadow: 0 3px 0 #8a6510; }
+  .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+  .ans {
+    padding: 18px 8px; border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.3);
+    background: rgba(255,255,255,.1);
+    color: #fff; font-size: 22px; font-weight: 800;
+  }
+  .ans:active { background: rgba(255,255,255,.22); }
+  .ans:disabled { opacity: .25; }
+  .mathq { font-size: 34px; font-weight: 900; letter-spacing: 2px; }
+  .seq { font-size: 42px; font-weight: 900; letter-spacing: 10px; color: #4dc3ff; }
+  .pad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; }
+  .pad button {
+    padding: 14px 0; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.3);
+    background: rgba(255,255,255,.1);
+    color: #fff; font-size: 20px; font-weight: 800;
+  }
+  .pad button:active { background: rgba(255,255,255,.22); }
+  .typed { font-size: 28px; letter-spacing: 8px; min-height: 36px; font-weight: 900; }
+  .oddgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
+  .oddgrid button {
+    font-size: 34px; padding: 10px 0;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+  }
+  .oddgrid button:active { background: rgba(255,255,255,.2); }
+
+  .board { display: flex; flex-direction: column; gap: 8px; }
+  .brow {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    padding: 10px 12px;
+    position: relative; overflow: hidden;
+  }
+  .brow .bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,213,74,.13); }
+  .brow .medal { font-size: 20px; width: 28px; text-align: center; z-index: 1; }
+  .brow .bname { flex: 1; font-weight: 800; font-size: 15px; z-index: 1; }
+  .brow .bval { font-size: 12px; opacity: .7; z-index: 1; }
+  .brow .bpts { font-weight: 900; color: #ffd54a; z-index: 1; }
+  .brow .bdelta { font-size: 12px; color: #3ddc84; font-weight: 800; z-index: 1; width: 38px; text-align: right; }
+  .brow.me { border-color: #ffd54a; }
+  .champ { text-align: center; font-size: 21px; font-weight: 900; padding: 14px; border-radius: 14px;
+    background: rgba(255,213,74,.12); border: 1px solid #ffd54a; line-height: 1.5; }
+  .waiting { text-align: center; font-size: 14px; opacity: .7; padding: 8px; }
+  .pulse { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .links { margin-top: 14px; font-size: 13px; text-align: center; }
+  .links a { color: rgba(255,255,255,.65); text-decoration: underline; }
+  .err { color: #ff8a8a; font-size: 13px; text-align: center; min-height: 18px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="logo">⚡ REFLEX ROYALE</div>
+<div class="sub">8 lightning rounds · everyone plays at once · fastest fingers win<br>2–8 phones, one room code</div>
+<div id="app"></div>
+<div class="links"><a href="index.html">🏠 All games</a></div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ---- audio: upbeat clicks, countdowns, fanfares ---- */
+  let actx = null;
+  function ensureAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    if (actx && actx.state === "suspended") actx.resume();
+  }
+  function tone(f1, f2, dur, type, vol, when = 0) {
+    if (!actx) return;
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f1, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(f2, 1), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  const sClick = () => tone(500, 460, 0.05, "square", 0.03);
+  const sBeep = () => tone(660, 660, 0.1, "square", 0.05);
+  const sGo = () => tone(880, 1320, 0.22, "square", 0.06);
+  const sGood = () => { tone(784, 1047, 0.12, "triangle", 0.06); tone(1047, 1319, 0.15, "triangle", 0.05, 0.1); };
+  const sBad = () => tone(220, 110, 0.3, "sawtooth", 0.06);
+  const sTap = () => tone(900, 880, 0.03, "square", 0.025);
+  const sRound = () => [523, 659, 784].forEach((f, i) => tone(f, f, 0.12, "triangle", 0.05, i * 0.09));
+  const sChamp = () => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, f, 0.2, "triangle", 0.06, i * 0.13));
+  const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
+
+  /* =====================================================
+     GAME ENGINE (host-side, transport-agnostic, testable)
+     ===================================================== */
+  function createReflexEngine(send) {
+    const TOTAL = 8;
+    const E = {
+      players: [],      // {id, name, score, gone}
+      phase: "lobby",   // lobby | round | standings
+      round: 0,
+      TOTAL,
+      spec: null,
+      results: null,    // {name: {value, ok}}
+    };
+    const alive = () => E.players.filter((p) => !p.gone);
+    const bcast = (msg) => { for (const p of alive()) send(p.id, msg); };
+
+    E.addPlayer = (id, name) => {
+      if (E.phase !== "lobby" || E.players.length >= 8) return false;
+      let n = (name || "Player").trim().slice(0, 14) || "Player";
+      let base = n, k = 2;
+      while (E.players.some((p) => p.name === n)) n = base + " " + k++;
+      E.players.push({ id, name: n, score: 0, gone: false });
+      sendLobby();
+      return n;
+    };
+    E.removePlayer = (id) => {
+      const p = E.players.find((x) => x.id === id);
+      if (!p) return;
+      if (E.phase === "lobby") E.players = E.players.filter((x) => x.id !== id);
+      else p.gone = true;
+      if (E.phase === "lobby") sendLobby();
+      else if (E.phase === "round") maybeScore();
+    };
+    function sendLobby() {
+      if (E.phase !== "lobby") return;
+      bcast({ t: "lobby", players: E.players.map((p) => p.name), canStart: E.players.length >= 2 });
+    }
+    E.sendLobby = sendLobby;
+
+    const ri = (n) => Math.floor(Math.random() * n);
+
+    function genSpec(roundNum) {
+      const types = ["reaction", "math", "mash", "memory", "odd"];
+      const type = types[ri(types.length)];
+      if (type === "reaction") {
+        return { type, rank: "asc", title: "⚡ REACTION", desc: "Tap the moment it turns GREEN. Tap early and you're out!", delay: 1600 + ri(2300) };
+      }
+      if (type === "math") {
+        const a = 3 + ri(7), b = 2 + ri(8), c = 2 + ri(8);
+        const forms = [
+          [`${a} + ${b} × ${c}`, a + b * c],
+          [`${a} × ${b} − ${c}`, a * b - c],
+          [`${a} + ${b} + ${c}`, a + b + c],
+        ];
+        const [q, correct] = forms[ri(forms.length)];
+        const answers = new Set([correct]);
+        while (answers.size < 4) answers.add(correct + (ri(13) - 6) || correct + 7);
+        return { type, rank: "asc", title: "🧮 QUICK MATH", desc: "First correct answer wins", q, correct, answers: [...answers].sort(() => Math.random() - 0.5) };
+      }
+      if (type === "mash") {
+        return { type, rank: "desc", title: "🔥 MASH!", desc: "Tap the button as fast as you can — 5 seconds", secs: 5 };
+      }
+      if (type === "memory") {
+        let seq = "";
+        for (let i = 0; i < 5; i++) seq += ri(10);
+        return { type, rank: "asc", title: "🧠 MEMORY", desc: "Memorize the code, then type it back", seq };
+      }
+      const pairs = [["😺", "😸"], ["🌝", "🌚"], ["🟦", "🟪"], ["🍩", "🍪"], ["🐶", "🐺"], ["⭐", "🌟"]];
+      const [base, odd] = pairs[ri(pairs.length)];
+      return { type: "odd", rank: "asc", title: "👀 ODD ONE OUT", desc: "One is different. Find it. Fast.", base, odd, n: 20, idx: ri(20) };
+    }
+
+    E.start = () => {
+      if (E.phase !== "lobby" || E.players.length < 2) return false;
+      for (const p of E.players) p.score = 0;
+      E.round = 0;
+      startRound();
+      return true;
+    };
+
+    function startRound() {
+      E.round++;
+      E.phase = "round";
+      E.results = {};
+      E.spec = genSpec(E.round);
+      bcast({ t: "round", num: E.round, total: TOTAL, spec: E.spec });
+    }
+
+    E.result = (id, value, ok) => {
+      if (E.phase !== "round") return;
+      const p = E.players.find((x) => x.id === id);
+      if (!p || p.gone || E.results[p.name]) return;
+      E.results[p.name] = { value: Number(value) || 0, ok: !!ok };
+      send(p.id, { t: "waiting", msg: "Locked in! Waiting for the others…" });
+      maybeScore();
+    };
+    function maybeScore() {
+      if (E.phase === "round" && alive().every((p) => E.results[p.name])) scoreRound();
+    }
+    E.forceRound = () => {
+      if (E.phase !== "round") return;
+      for (const p of alive()) if (!E.results[p.name]) E.results[p.name] = { value: 0, ok: false };
+      scoreRound();
+    };
+
+    function fmt(spec, r) {
+      if (!r.ok) return "✗ missed";
+      if (spec.type === "mash") return r.value + " taps";
+      return (r.value / 1000).toFixed(3) + "s";
+    }
+
+    function scoreRound() {
+      E.phase = "standings";
+      const n = alive().length;
+      const entries = alive().map((p) => ({ p, r: E.results[p.name] }));
+      const valid = entries.filter((e) => e.r.ok)
+        .sort((a, b) => E.spec.rank === "desc" ? b.r.value - a.r.value : a.r.value - b.r.value);
+      let prevVal = null, prevPts = 0;
+      valid.forEach((e, i) => {
+        let pts = n - i;
+        if (prevVal !== null && e.r.value === prevVal) pts = prevPts;   // ties share
+        e.pts = pts; prevVal = e.r.value; prevPts = pts;
+        e.p.score += pts;
+      });
+      for (const e of entries) if (!e.r.ok) e.pts = 0;
+      const board = [...alive()].sort((a, b) => b.score - a.score).map((p) => {
+        const e = entries.find((x) => x.p === p);
+        return { name: p.name, total: p.score, delta: e ? e.pts : 0, display: e ? fmt(E.spec, e.r) : "—" };
+      });
+      bcast({ t: "standings", board, num: E.round, total: TOTAL, final: E.round >= TOTAL });
+    }
+
+    E.next = () => {
+      if (E.phase !== "standings" || E.round >= TOTAL) return;
+      startRound();
+    };
+    E.playAgain = () => {
+      if (E.phase !== "standings" || E.round < TOTAL) return;
+      E.phase = "lobby";
+      E.players = E.players.filter((p) => !p.gone);
+      for (const p of E.players) p.score = 0;
+      sendLobby();
+    };
+
+    return E;
+  }
+  window.__reflexEngine = createReflexEngine;
+
+  /* =====================================================
+     CLIENT UI
+     ===================================================== */
+  const app = document.getElementById("app");
+  let peer = null, hostConns = {}, clientConn = null;
+  let isHost = false, myName = "";
+  let engine = null;
+  let submitted = false;
+  let roundTimers = [];
+
+  function h(html) { app.innerHTML = html; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  function clearTimers() { roundTimers.forEach(clearTimeout); roundTimers = []; }
+  function after(ms, fn) { roundTimers.push(setTimeout(fn, ms)); }
+
+  const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  function makeCode() {
+    let c = "";
+    for (let i = 0; i < 4; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return c;
+  }
+  const peerId = (code) => "kira-reflex-" + code.toLowerCase();
+
+  function hostGame(name) {
+    myName = name;
+    isHost = true;
+    showWait("Setting up your room…");
+    peer = new Peer(peerId(makeCodeStore.code = makeCode()));
+    peer.on("open", () => {
+      engine = createReflexEngine((pid, msg) => {
+        if (pid === "host") handleMsg(msg);
+        else if (hostConns[pid]) try { hostConns[pid].send(msg); } catch (e) {}
+      });
+      engine.code = makeCodeStore.code;
+      myName = engine.addPlayer("host", name);
+      peer.on("connection", (conn) => {
+        conn.on("data", (msg) => {
+          if (!msg || typeof msg !== "object") return;
+          if (msg.t === "join") { hostConns[conn.peer] = conn; engine.addPlayer(conn.peer, msg.name); }
+          else if (msg.t === "result") engine.result(conn.peer, msg.value, msg.ok);
+        });
+        conn.on("close", () => { delete hostConns[conn.peer]; engine.removePlayer(conn.peer); });
+      });
+      engine.sendLobby();
+    });
+    peer.on("error", (e) => showHome("Couldn't create room (" + e.type + "). Try again."));
+  }
+  const makeCodeStore = { code: "" };
+
+  function joinGame(code, name) {
+    myName = name;
+    isHost = false;
+    showWait("Joining room " + code.toUpperCase() + "…");
+    peer = new Peer();
+    peer.on("open", () => {
+      clientConn = peer.connect(peerId(code), { reliable: true });
+      let opened = false;
+      clientConn.on("open", () => { opened = true; clientConn.send({ t: "join", name }); });
+      clientConn.on("data", (msg) => handleMsg(msg));
+      clientConn.on("close", () => showHome("Connection lost. Rejoin with the room code."));
+      setTimeout(() => { if (!opened) showHome("Room not found — check the code (and ask the host to keep their screen on)."); }, 9000);
+    });
+    peer.on("error", (e) => {
+      if (e.type === "peer-unavailable") showHome("Room not found — check the code (and ask the host to keep their screen on).");
+      else showHome("Connection error (" + e.type + ").");
+    });
+  }
+
+  const submit = (value, ok) => {
+    if (submitted) return;
+    submitted = true;
+    clearTimers();
+    if (isHost) engine.result("host", value, ok);
+    else if (clientConn) clientConn.send({ t: "result", value, ok });
+  };
+
+  function handleMsg(msg) {
+    if (msg.t === "lobby") renderLobby(msg);
+    else if (msg.t === "round") { submitted = false; clearTimers(); renderRound(msg); }
+    else if (msg.t === "waiting") renderWaiting(msg.msg);
+    else if (msg.t === "standings") { clearTimers(); renderStandings(msg); }
+  }
+
+  function hostBtn(label, fn, extra) {
+    const id = "hb" + Math.random().toString(36).slice(2, 8);
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.onclick = () => { ensureAudio(); sClick(); fn(); };
+    }, 0);
+    return `<button class="btn ${extra || ""}" id="${id}">${label}</button>`;
+  }
+
+  function showHome(err) {
+    clearTimers();
+    h(`
+      <div class="box">
+        <h2>YOUR NAME</h2>
+        <input id="nameIn" maxlength="14" placeholder="e.g. Kira" autocomplete="off">
+        <div class="err">${err ? esc(err) : ""}</div>
+        ${hostBtn("HOST A GAME", () => {
+          const n = document.getElementById("nameIn").value.trim();
+          if (!n) return showHome("Enter a name first!");
+          if (typeof Peer === "undefined") return showHome("Couldn't load the network library — check your internet.");
+          hostGame(n);
+        })}
+      </div>
+      <div class="box">
+        <h2>OR JOIN A ROOM</h2>
+        <input id="codeIn" maxlength="4" placeholder="CODE" style="letter-spacing:8px;text-transform:uppercase" autocomplete="off">
+        ${hostBtn("JOIN", () => {
+          const n = document.getElementById("nameIn").value.trim();
+          const c = document.getElementById("codeIn").value.trim();
+          if (!n) return showHome("Enter a name first!");
+          if (c.length !== 4) return showHome("Room codes are 4 letters.");
+          if (typeof Peer === "undefined") return showHome("Couldn't load the network library — check your internet.");
+          joinGame(c, n);
+        }, "alt")}
+      </div>
+    `);
+  }
+  function showWait(text) { h(`<div class="box waiting pulse">${esc(text)}</div>`); }
+  function renderWaiting(text) {
+    h(`<div class="box waiting pulse">${esc(text)}</div>` + (isHost && engine && engine.phase === "round" ? hostBtn("⏭ force end round (stuck?)", () => engine.forceRound(), "ghost") : ""));
+  }
+
+  function renderLobby(msg) {
+    h(`
+      ${isHost ? `<div class="box" style="text-align:center">
+        <h2>ROOM CODE — tell your friends</h2>
+        <div class="code-big">${engine.code}</div>
+        <div class="code-hint">they open this page → JOIN → type the code<br>keep this screen ON while they join</div>
+      </div>` : ""}
+      <div class="box">
+        <h2>PLAYERS (${msg.players.length}/8)</h2>
+        <div class="chips">${msg.players.map((p) => `<span class="chip ${p === myName ? "me" : ""}">${esc(p)}</span>`).join("")}</div>
+      </div>
+      ${isHost
+        ? (msg.canStart ? hostBtn("START — 8 ROUNDS ⚡", () => engine.start()) : `<div class="waiting pulse">need at least 2 players…</div>`)
+        : `<div class="waiting pulse">waiting for the host to start…</div>`}
+    `);
+  }
+
+  /* ---- round rendering: shared countdown then the mini-game ---- */
+  function renderRound(msg) {
+    const spec = msg.spec;
+    const head = `
+      <div class="round-head">ROUND ${msg.num} / ${msg.total}</div>
+      <div class="round-title">${spec.title}</div>
+      <div class="round-desc">${spec.desc}</div>`;
+    let count = 3;
+    const showCount = () => {
+      if (count > 0) {
+        sBeep(); buzz(15);
+        h(head + `<div class="arena"><div class="countdown">${count}</div></div>`);
+        count--;
+        after(700, showCount);
+      } else {
+        sGo();
+        startGame();
+      }
+    };
+    const startGame = () => {
+      // global 20s safety: auto-fail so the round never hangs
+      after(20000, () => submit(0, false));
+      if (spec.type === "reaction") runReaction(head, spec);
+      else if (spec.type === "math") runMath(head, spec);
+      else if (spec.type === "mash") runMash(head, spec);
+      else if (spec.type === "memory") runMemory(head, spec);
+      else runOdd(head, spec);
+    };
+    showCount();
+  }
+
+  function arenaTap(id, fn) {
+    setTimeout(() => { const el = document.getElementById(id); if (el) el.onpointerdown = fn; }, 0);
+  }
+
+  function runReaction(head, spec) {
+    let t0 = 0, green = false;
+    h(head + `<div class="arena red" id="zone"><div class="bigword">WAIT…</div></div>`);
+    arenaTap("zone", () => {
+      if (!green) { sBad(); buzz(100); h(head + `<div class="arena red"><div class="bigword">TOO SOON! 💀</div></div>`); submit(9999, false); }
+    });
+    after(spec.delay, () => {
+      if (submitted) return;
+      green = true;
+      t0 = performance.now();
+      h(head + `<div class="arena green" id="zone"><div class="bigword">TAP!!!</div></div>`);
+      arenaTap("zone", () => {
+        const ms = Math.round(performance.now() - t0);
+        sGood(); buzz(20);
+        h(head + `<div class="arena green"><div class="timer-ms">${(ms / 1000).toFixed(3)}s</div></div>`);
+        submit(ms, true);
+      });
+    });
+  }
+
+  function runMath(head, spec) {
+    const t0 = performance.now();
+    let penalty = 0;
+    h(head + `<div class="arena"><div class="mathq">${spec.q} = ?</div>
+      <div class="answers">${spec.answers.map((a, i) => `<button class="ans" id="ans${i}">${a}</button>`).join("")}</div></div>`);
+    spec.answers.forEach((a, i) => {
+      setTimeout(() => {
+        const el = document.getElementById("ans" + i);
+        if (!el) return;
+        el.onclick = () => {
+          ensureAudio();
+          if (a === spec.correct) {
+            const ms = Math.round(performance.now() - t0 + penalty);
+            sGood(); buzz(20);
+            submit(ms, true);
+          } else {
+            sBad(); buzz(80);
+            penalty += 2000;
+            el.disabled = true;
+          }
+        };
+      }, 0);
+    });
+  }
+
+  function runMash(head, spec) {
+    let count = 0;
+    h(head + `<div class="arena"><div class="mash-count" id="cnt">0</div>
+      <button class="mash-btn" id="mash">MASH!</button>
+      <div class="waiting" id="left">${spec.secs}.0s</div></div>`);
+    setTimeout(() => {
+      const el = document.getElementById("mash");
+      if (el) el.onpointerdown = () => { count++; sTap(); document.getElementById("cnt").textContent = count; };
+    }, 0);
+    const t0 = performance.now();
+    const tick = () => {
+      const left = spec.secs * 1000 - (performance.now() - t0);
+      const lEl = document.getElementById("left");
+      if (lEl) lEl.textContent = Math.max(0, left / 1000).toFixed(1) + "s";
+      if (left <= 0) { sGood(); submit(count, true); return; }
+      after(100, tick);
+    };
+    tick();
+  }
+
+  function runMemory(head, spec) {
+    h(head + `<div class="arena"><div class="seq">${spec.seq}</div></div>`);
+    after(1600, () => {
+      if (submitted) return;
+      const t0 = performance.now();
+      let typed = "";
+      h(head + `<div class="arena"><div class="typed" id="typed"></div>
+        <div class="pad">${[1,2,3,4,5,6,7,8,9,0].map((d) => `<button id="pd${d}">${d}</button>`).join("")}</div></div>`);
+      [1,2,3,4,5,6,7,8,9,0].forEach((d) => {
+        setTimeout(() => {
+          const el = document.getElementById("pd" + d);
+          if (!el) return;
+          el.onclick = () => {
+            ensureAudio(); sTap();
+            typed += d;
+            document.getElementById("typed").textContent = typed;
+            if (typed.length >= spec.seq.length) {
+              if (typed === spec.seq) { sGood(); buzz(20); submit(Math.round(performance.now() - t0), true); }
+              else { sBad(); buzz(100); submit(9999, false); }
+            }
+          };
+        }, 0);
+      });
+    });
+  }
+
+  function runOdd(head, spec) {
+    const t0 = performance.now();
+    const cells = [];
+    for (let i = 0; i < spec.n; i++) cells.push(i === spec.idx ? spec.odd : spec.base);
+    h(head + `<div class="arena"><div class="oddgrid">${cells.map((e, i) => `<button id="od${i}">${e}</button>`).join("")}</div></div>`);
+    cells.forEach((e, i) => {
+      setTimeout(() => {
+        const el = document.getElementById("od" + i);
+        if (!el) return;
+        el.onclick = () => {
+          ensureAudio();
+          if (i === spec.idx) { sGood(); buzz(20); submit(Math.round(performance.now() - t0), true); }
+          else { sBad(); buzz(100); submit(9999, false); }
+        };
+      }, 0);
+    });
+  }
+
+  function renderStandings(msg) {
+    (msg.final ? sChamp : sRound)();
+    buzz(msg.final ? [60, 40, 60, 40, 140] : 30);
+    const max = Math.max(...msg.board.map((b) => b.total), 1);
+    const medals = ["🥇", "🥈", "🥉"];
+    const rows = msg.board.map((b, i) => `
+      <div class="brow ${b.name === myName ? "me" : ""}">
+        <div class="bar" style="width:${(b.total / max) * 100}%"></div>
+        <div class="medal">${medals[i] || (i + 1)}</div>
+        <div class="bname">${esc(b.name)}</div>
+        <div class="bval">${esc(b.display)}</div>
+        <div class="bpts">${b.total}</div>
+        <div class="bdelta">${b.delta ? "+" + b.delta : ""}</div>
+      </div>`).join("");
+    const champ = msg.final ? `<div class="champ">👑 ${esc(msg.board[0].name)} IS THE REFLEX ROYALE CHAMPION!</div>` : "";
+    const ctl = isHost
+      ? (msg.final ? hostBtn("PLAY AGAIN 🔁", () => engine.playAgain()) : hostBtn("NEXT ROUND ⚡", () => engine.next()))
+      : `<div class="waiting pulse">${msg.final ? "host can start a rematch…" : "next round starting soon…"}</div>`;
+    h(`
+      <div class="round-head">${msg.final ? "FINAL STANDINGS" : "STANDINGS — ROUND " + msg.num + " / " + msg.total}</div>
+      ${champ}
+      <div class="box board">${rows}</div>
+      ${ctl}
+    `);
+  }
+
+  showHome();
+})();
+</script>
+</body>
+</html>
