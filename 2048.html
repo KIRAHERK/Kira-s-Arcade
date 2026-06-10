@@ -154,6 +154,7 @@
   <div class="panel">
     <h1 id="overTitle">GAME OVER</h1>
     <p id="overText">Score <b id="finalScore">0</b></p>
+    <div id="walletLine" style="margin:-6px 0 14px;color:#ffd166;font-size:14px;font-weight:700;"></div>
     <button class="big-btn" id="retryBtn">NEW GAME</button>
   </div>
 </div>
@@ -164,6 +165,16 @@
 
   const SIZE = 4, GAP = 10;
   const SAVE_KEY = "fusion2048_v1";
+  /* ---- shared arcade wallet ---- */
+  const WALLET_KEY = "luckySpinSave_v1";
+  function walletAdd(n) {
+    let s = { balance: 1000, betIndex: 1, spins: 0, biggestWin: 0 };
+    try { const j = JSON.parse(localStorage.getItem(WALLET_KEY)); if (j && typeof j.balance === "number") s = Object.assign(s, j); } catch (e) {}
+    s.balance += n;
+    localStorage.setItem(WALLET_KEY, JSON.stringify(s));
+    return s.balance;
+  }
+
   let best = parseInt(localStorage.getItem(SAVE_KEY) || "0", 10) || 0;
 
   const boardEl = document.getElementById("board");
@@ -351,6 +362,9 @@
   }
 
   function showOverlay(isWin) {
+    const earned = isWin ? 500 : Math.floor(score / 50);
+    const wbal = walletAdd(earned);
+    document.getElementById("walletLine").textContent = "+\u{1FA99} " + earned + " earned \u00b7 Wallet " + wbal.toLocaleString("en-US");
     document.getElementById("overTitle").textContent = isWin ? "⚡ 2048! YOU WIN!" : "GAME OVER";
     document.getElementById("overText").innerHTML = (isWin ? "Legendary! Score " : "Score ") + "<b>" + score + "</b>" + (isWin ? "<br>Keep going for 4096?" : "");
     document.getElementById("retryBtn").textContent = isWin ? "KEEP GOING" : "NEW GAME";

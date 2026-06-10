@@ -50,38 +50,46 @@
     position: relative;
   }
   .seat-label { font-size: 11px; letter-spacing: 2px; opacity: .6; margin-bottom: 6px; font-weight: 700; }
-  .hand-row { display: flex; align-items: center; gap: 8px; min-height: 96px; }
+  .hand-row { display: flex; align-items: center; gap: 14px; min-height: 100px; flex-wrap: wrap; }
+  .hand-group {
+    display: flex; align-items: center;
+    padding: 4px 6px;
+    border-radius: 12px;
+    border: 2px solid transparent;
+  }
+  .hand-group.active { border-color: rgba(255, 213, 74, .8); background: rgba(255,213,74,.06); }
+  .hand-group .card + .card { margin-left: -34px; }
   .hand-value {
-    margin-left: 6px;
+    margin-left: 8px;
     background: rgba(0,0,0,.45);
     border-radius: 999px;
     padding: 4px 11px;
     font-weight: 800;
     font-size: 15px;
     border: 1px solid rgba(255,255,255,.2);
+    white-space: nowrap;
   }
   .hand-value.bust { color: #ff7a7a; border-color: rgba(255,90,90,.6); }
   .hand-value.bj { color: #ffd54a; border-color: rgba(255,213,74,.7); }
+  .hand-value.won { color: #3ddc84; border-color: rgba(61,220,132,.7); }
 
   .card {
-    width: 64px; height: 92px;
+    width: 62px; height: 90px;
     border-radius: 9px;
     background: #fdfdf6;
     color: #16161d;
     position: relative;
-    box-shadow: 0 5px 14px rgba(0,0,0,.45);
+    box-shadow: -2px 5px 12px rgba(0,0,0,.45);
     flex-shrink: 0;
     transition: transform .3s cubic-bezier(.3,1.3,.5,1), opacity .3s;
-    transform-style: preserve-3d;
   }
   .card.enter { transform: translate(40vw, -30vh) rotate(20deg); opacity: 0; }
   .card .corner {
-    position: absolute; top: 5px; left: 7px;
-    font-size: 17px; font-weight: 800; line-height: 1.05;
+    position: absolute; top: 5px; left: 6px;
+    font-size: 16px; font-weight: 800; line-height: 1.05;
     text-align: center;
   }
-  .card .corner.flip2 { top: auto; left: auto; bottom: 5px; right: 7px; transform: rotate(180deg); }
-  .card .pip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 34px; }
+  .card .pip { position: absolute; right: 7px; bottom: 5px; font-size: 22px; }
   .card.red { color: #d3293c; }
   .card.back {
     background: repeating-linear-gradient(45deg, #2456b3 0 7px, #1c4490 7px 14px);
@@ -94,7 +102,7 @@
   .msg {
     text-align: center;
     min-height: 34px;
-    font-size: 22px;
+    font-size: 21px;
     font-weight: 800;
     letter-spacing: 1px;
     text-shadow: 0 2px 8px rgba(0,0,0,.5);
@@ -119,17 +127,19 @@
   .bet-display { text-align: center; min-width: 100px; }
   .bet-display .label { font-size: 11px; letter-spacing: 2px; opacity: .65; }
   .bet-display .value { font-size: 24px; font-weight: 800; color: #ffd54a; }
-  .actions { display: flex; gap: 10px; }
+  .actions { display: flex; gap: 8px; }
   .act {
-    flex: 1; padding: 15px 6px;
+    flex: 1; padding: 14px 4px;
     border: none; border-radius: 14px;
-    font-size: 17px; font-weight: 800; letter-spacing: 1px;
+    font-size: 15px; font-weight: 800; letter-spacing: .5px;
     color: #2a1300;
     background: linear-gradient(180deg, #ffe27a, #ffd54a 55%, #e0a92b);
     box-shadow: 0 5px 0 #8a6510;
+    white-space: nowrap;
   }
   .act.alt { background: linear-gradient(180deg, #9be8c0, #3ddc84 55%, #1f9c5b); box-shadow: 0 5px 0 #11603a; color: #06250f; }
   .act.alt2 { background: linear-gradient(180deg, #a8d4ff, #4dc3ff 55%, #1f86c7); box-shadow: 0 5px 0 #0f4a73; color: #04263b; }
+  .act.alt3 { background: linear-gradient(180deg, #ffb3d1, #ff3d8b 55%, #b81f5e); box-shadow: 0 5px 0 #6e1238; color: #fff; }
   .act:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,.4); }
   .act:disabled { filter: grayscale(.8) brightness(.65); box-shadow: 0 5px 0 #444; }
   .links { display: flex; gap: 8px; margin-top: 10px; }
@@ -189,7 +199,8 @@
     <div class="actions">
       <button class="act alt" id="hitBtn">HIT</button>
       <button class="act alt2" id="standBtn">STAND</button>
-      <button class="act" id="doubleBtn">2× DOUBLE</button>
+      <button class="act" id="doubleBtn">2×</button>
+      <button class="act alt3 hidden" id="splitBtn">SPLIT</button>
     </div>
   </div>
   <div class="links">
@@ -204,7 +215,7 @@
 (() => {
   "use strict";
 
-  /* ---- shared wallet with Lucky Spin ---- */
+  /* ---- shared arcade wallet ---- */
   const SAVE_KEY = "luckySpinSave_v1";
   let save = { balance: 1000, betIndex: 1, spins: 0, biggestWin: 0 };
   try {
@@ -213,11 +224,13 @@
   } catch (e) {}
   function persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 
-  const BETS = [10, 25, 50, 100, 250];
+  const BETS = [10, 25, 50, 100, 250, 500, 1000];
   let betIndex = 1;
-  let bet = 0;              // active wager this hand
-  let state = "bet";        // bet | play | done
-  let deck = [], pHand = [], dHand = [];
+  let state = "bet";        // bet | play | dealer | done
+  let deck = [];
+  let hands = [];           // {cards, bet, done, groupEl, badge}
+  let active = 0;
+  let dHand = [];
   let holeEl = null;
 
   const $ = (id) => document.getElementById(id);
@@ -225,7 +238,7 @@
   const betVal = $("betVal"), msg = $("msg");
   const dealerHand = $("dealerHand"), playerHand = $("playerHand"), dealerTag = $("dealerTag");
   const betUI = $("betUI"), playUI = $("playUI");
-  const dealBtn = $("dealBtn"), hitBtn = $("hitBtn"), standBtn = $("standBtn"), doubleBtn = $("doubleBtn");
+  const dealBtn = $("dealBtn"), hitBtn = $("hitBtn"), standBtn = $("standBtn"), doubleBtn = $("doubleBtn"), splitBtn = $("splitBtn");
   const topupBtn = $("topupBtn");
 
   /* ---- audio ---- */
@@ -281,55 +294,78 @@
     const el = document.createElement("div");
     const red = card.s === "♥" || card.s === "♦";
     el.className = "card enter" + (red ? " red" : "") + (faceDown ? " back" : "");
-    el.innerHTML = `<div class="corner">${card.r}<br>${card.s}</div><div class="pip">${card.s}</div><div class="corner flip2">${card.r}<br>${card.s}</div>`;
+    el.innerHTML = `<div class="corner">${card.r}<br>${card.s}</div><div class="pip">${card.s}</div>`;
     return el;
   }
-  async function dealCard(hand, container, faceDown) {
+  async function dealTo(cards, container, faceDown) {
     const card = draw();
-    hand.push(card);
+    cards.push(card);
     const el = cardEl(card, faceDown);
-    container.appendChild(el);
+    // keep value badge last in the group
+    const badge = container.querySelector ? container.querySelector(".hand-value") : null;
+    if (badge) container.insertBefore(el, badge); else container.appendChild(el);
     if (faceDown) holeEl = el;
     void el.offsetHeight;
     el.classList.remove("enter");
     sfx.card(); buzz(8);
-    await sleep(260);
-    updateValues(faceDown ? true : undefined);
+    await sleep(240);
+    refreshBadges();
     return card;
   }
-  function valueBadge(container, cards, hideFirst) {
-    let old = container.querySelector(".hand-value");
-    if (old) old.remove();
-    const span = document.createElement("div");
-    span.className = "hand-value";
-    let v;
-    if (hideFirst) {
-      // the hole card is the second one dealt; only the upcard is visible
-      const visible = cards.slice(0, 1);
-      v = visible.length ? value(visible) + "+" : "?";
-    } else {
-      v = value(cards);
-      if (v > 21) { span.classList.add("bust"); }
-      if (isBJ(cards)) { span.classList.add("bj"); v = "BJ!"; }
-    }
-    span.textContent = v;
-    container.appendChild(span);
+  function makeGroup(hand) {
+    const g = document.createElement("div");
+    g.className = "hand-group";
+    const badge = document.createElement("div");
+    badge.className = "hand-value";
+    g.appendChild(badge);
+    hand.groupEl = g;
+    hand.badge = badge;
+    playerHand.appendChild(g);
   }
-  function updateValues(dealerHidden = state === "play") {
-    if (pHand.length) valueBadge(playerHand, pHand, false);
-    if (dHand.length) valueBadge(dealerHand, dHand, dealerHidden);
+  function refreshBadges() {
+    for (const h of hands) {
+      if (!h.badge) continue;
+      const v = value(h.cards);
+      h.badge.className = "hand-value" + (v > 21 ? " bust" : "") + (isBJ(h.cards) && hands.length === 1 ? " bj" : "");
+      h.badge.textContent = (v > 21 ? "BUST " : "") + v + (h.bet !== BETS[betIndex] && state !== "bet" ? " · 🪙" + h.bet : "");
+    }
+    // dealer badge
+    let old = dealerHand.querySelector(".hand-value");
+    if (old) old.remove();
+    if (dHand.length) {
+      const span = document.createElement("div");
+      span.className = "hand-value";
+      if (state === "play") {
+        span.textContent = value(dHand.slice(0, 1)) + "+";
+      } else {
+        const dv = value(dHand);
+        span.textContent = dv;
+        if (dv > 21) span.classList.add("bust");
+      }
+      dealerHand.appendChild(span);
+    }
+    // active highlight
+    hands.forEach((h, i) => {
+      if (h.groupEl) h.groupEl.classList.toggle("active", state === "play" && i === active && hands.length > 1);
+    });
   }
   function bumpBalance() {
     balanceEl.classList.remove("bump");
     void balanceEl.offsetWidth;
     balanceEl.classList.add("bump");
   }
+  function canSplit() {
+    return state === "play" && hands.length === 1 && hands[0].cards.length === 2 &&
+      hands[0].cards[0].v === hands[0].cards[1].v && save.balance >= hands[0].bet;
+  }
   function render() {
     balanceVal.textContent = save.balance.toLocaleString("en-US");
-    betVal.textContent = BETS[betIndex];
+    betVal.textContent = BETS[betIndex].toLocaleString("en-US");
     dealBtn.disabled = save.balance < BETS[betIndex];
     topupBtn.style.display = save.balance < BETS[0] ? "block" : "none";
-    doubleBtn.disabled = !(state === "play" && pHand.length === 2 && save.balance >= bet);
+    const h = hands[active];
+    doubleBtn.disabled = !(state === "play" && h && h.cards.length === 2 && save.balance >= h.bet);
+    splitBtn.classList.toggle("hidden", !canSplit());
   }
   function setMsg(text, cls) { msg.textContent = text; msg.className = "msg" + (cls ? " " + cls : ""); }
 
@@ -338,26 +374,33 @@
     if (state !== "bet" || save.balance < BETS[betIndex]) return;
     ensureAudio(); sfx.chip();
     state = "play";
-    bet = BETS[betIndex];
+    const bet = BETS[betIndex];
     save.balance -= bet; persist();
-    pHand = []; dHand = []; holeEl = null;
+    hands = [{ cards: [], bet, done: false }];
+    active = 0;
+    dHand = []; holeEl = null;
     playerHand.innerHTML = ""; dealerHand.innerHTML = "";
     dealerTag.textContent = "";
     setMsg("");
+    makeGroup(hands[0]);
     betUI.classList.add("hidden");
     playUI.classList.remove("hidden");
     render();
 
-    await dealCard(pHand, playerHand, false);
-    await dealCard(dHand, dealerHand, false);
-    await dealCard(pHand, playerHand, false);
-    await dealCard(dHand, dealerHand, true);
+    await dealTo(hands[0].cards, hands[0].groupEl, false);
+    await dealTo(dHand, dealerHand, false);
+    await dealTo(hands[0].cards, hands[0].groupEl, false);
+    await dealTo(dHand, dealerHand, true);
 
-    if (isBJ(dHand) || isBJ(pHand)) {
+    if (isBJ(dHand) || isBJ(hands[0].cards)) {
       await revealHole();
-      if (isBJ(dHand) && isBJ(pHand)) return settle("push");
-      if (isBJ(dHand)) return settle("lose");
-      return settle("blackjack");
+      state = "done";
+      let payout = 0, text, cls;
+      if (isBJ(dHand) && isBJ(hands[0].cards)) { payout = bet; text = "PUSH — both blackjack"; cls = "push"; sfx.push(); }
+      else if (isBJ(dHand)) { text = "DEALER BLACKJACK −🪙 " + bet; cls = "lose"; sfx.lose(); buzz(150); }
+      else { payout = Math.floor(bet * 2.5); text = "BLACKJACK! +🪙 " + (payout - bet); cls = "win"; sfx.bj(); buzz([60, 40, 60, 40, 120]); }
+      finishRound(payout, text, cls);
+      return;
     }
     render();
   }
@@ -367,60 +410,119 @@
     holeEl.classList.remove("back");
     holeEl.classList.add("reveal");
     sfx.card();
-    updateValues(false);
     await sleep(420);
   }
 
-  async function hit() {
-    if (state !== "play") return;
-    ensureAudio();
-    await dealCard(pHand, playerHand, false);
+  async function split() {
+    if (!canSplit()) return;
+    ensureAudio(); sfx.chip();
+    const h0 = hands[0];
+    save.balance -= h0.bet; persist();
+    const moved = h0.cards.pop();
+    const h1 = { cards: [moved], bet: h0.bet, done: false };
+    hands.push(h1);
+    // move the card's element into a new group
+    const cardEls = h0.groupEl.querySelectorAll(".card");
+    const movedEl = cardEls[cardEls.length - 1];
+    makeGroup(h1);
+    h1.groupEl.insertBefore(movedEl, h1.badge);
     render();
-    const v = value(pHand);
-    if (v > 21) { await revealHole(); return settle("lose"); }
-    if (v === 21) return stand();
+    refreshBadges();
+    await sleep(200);
+    await dealTo(h0.cards, h0.groupEl, false);
+    await dealTo(h1.cards, h1.groupEl, false);
+    active = 0;
+    refreshBadges();
+    render();
+    if (value(hands[0].cards) === 21) { hands[0].done = true; await advance(); }
+  }
+
+  async function hit() {
+    const h = hands[active];
+    if (state !== "play" || !h) return;
+    ensureAudio();
+    await dealTo(h.cards, h.groupEl, false);
+    render();
+    const v = value(h.cards);
+    if (v >= 21) { h.done = true; await advance(); }
   }
 
   async function doubleDown() {
-    if (state !== "play" || pHand.length !== 2 || save.balance < bet) return;
+    const h = hands[active];
+    if (state !== "play" || !h || h.cards.length !== 2 || save.balance < h.bet) return;
     ensureAudio(); sfx.chip();
-    save.balance -= bet; persist();
-    bet *= 2;
+    save.balance -= h.bet; persist();
+    h.bet *= 2;
     render();
-    await dealCard(pHand, playerHand, false);
-    if (value(pHand) > 21) { await revealHole(); return settle("lose"); }
-    return stand();
+    await dealTo(h.cards, h.groupEl, false);
+    h.done = true;
+    await advance();
   }
 
   async function stand() {
-    if (state !== "play") return;
-    state = "dealer";
-    await revealHole();
-    while (value(dHand) < 17) {
-      await sleep(280);
-      await dealCard(dHand, dealerHand, false);
-    }
-    const pv = value(pHand), dv = value(dHand);
-    if (dv > 21 || pv > dv) return settle("win");
-    if (pv < dv) return settle("lose");
-    return settle("push");
+    const h = hands[active];
+    if (state !== "play" || !h) return;
+    h.done = true;
+    await advance();
   }
 
-  function settle(result) {
-    state = "done";
-    let payout = 0;
-    if (result === "blackjack") { payout = Math.floor(bet * 2.5); setMsg("BLACKJACK! +🪙 " + (payout - bet), "win"); sfx.bj(); buzz([60, 40, 60, 40, 120]); }
-    else if (result === "win") { payout = bet * 2; setMsg("YOU WIN +🪙 " + bet, "win"); sfx.win(); buzz([40, 30, 80]); }
-    else if (result === "push") { payout = bet; setMsg("PUSH — bet returned", "push"); sfx.push(); }
-    else {
-      const busted = value(pHand) > 21;
-      setMsg(busted ? "BUST! −🪙 " + bet : "DEALER WINS −🪙 " + bet, "lose");
-      sfx.lose(); buzz(150);
+  async function advance() {
+    refreshBadges();
+    if (active < hands.length - 1) {
+      active++;
+      refreshBadges(); render();
+      if (value(hands[active].cards) === 21) { hands[active].done = true; await advance(); }
+      return;
     }
+    await dealerTurn();
+  }
+
+  async function dealerTurn() {
+    state = "dealer";
+    await revealHole();
+    refreshBadges();
+    const anyLive = hands.some((h) => value(h.cards) <= 21);
+    if (anyLive) {
+      while (value(dHand) < 17) {
+        await sleep(280);
+        await dealTo(dHand, dealerHand, false);
+      }
+    }
+    settleAll();
+  }
+
+  function settleAll() {
+    state = "done";
+    const dv = value(dHand);
+    let payout = 0, staked = 0;
+    for (const h of hands) {
+      staked += h.bet;
+      const pv = value(h.cards);
+      let won = false, push = false;
+      if (pv <= 21) {
+        if (dv > 21 || pv > dv) { won = true; payout += h.bet * 2; }
+        else if (pv === dv) { push = true; payout += h.bet; }
+      }
+      if (h.badge) {
+        if (won) { h.badge.classList.add("won"); h.badge.textContent = pv + " ✓"; }
+        else if (push) h.badge.textContent = pv + " =";
+        else h.badge.textContent = (pv > 21 ? "BUST" : pv) + " ✗";
+      }
+    }
+    const net = payout - staked;
+    let text, cls;
+    if (net > 0) { text = "YOU WIN +🪙 " + net; cls = "win"; sfx.win(); buzz([40, 30, 80]); }
+    else if (net === 0) { text = "PUSH — bets returned"; cls = "push"; sfx.push(); }
+    else { text = "DEALER WINS −🪙 " + (-net); cls = "lose"; sfx.lose(); buzz(150); }
+    finishRound(payout, text, cls);
+  }
+
+  function finishRound(payout, text, cls) {
     if (payout) { save.balance += payout; bumpBalance(); }
     persist();
+    setMsg(text, cls);
     dealerTag.textContent = "(" + value(dHand) + ")";
-    updateValues(false);
+    refreshBadges();
     playUI.classList.add("hidden");
     betUI.classList.remove("hidden");
     state = "bet";
@@ -432,6 +534,7 @@
   hitBtn.addEventListener("click", hit);
   standBtn.addEventListener("click", stand);
   doubleBtn.addEventListener("click", doubleDown);
+  splitBtn.addEventListener("click", split);
   $("betUp").addEventListener("click", () => { ensureAudio(); sfx.chip(); betIndex = Math.min(BETS.length - 1, betIndex + 1); render(); });
   $("betDown").addEventListener("click", () => { ensureAudio(); sfx.chip(); betIndex = Math.max(0, betIndex - 1); render(); });
   topupBtn.addEventListener("click", () => {
@@ -448,11 +551,12 @@
   window.__bj = {
     get state() { return state; },
     get balance() { return save.balance; },
-    get bet() { return bet; },
-    get pHand() { return pHand; },
+    get hands() { return hands; },
+    get active() { return active; },
     get dHand() { return dHand; },
-    value, isBJ, deal, hit, stand, doubleDown,
+    value, isBJ, deal, hit, stand, doubleDown, split, canSplit,
     setBalance(n) { save.balance = n; render(); },
+    setDeck(cards) { deck = cards.slice(); },
   };
 })();
 </script>

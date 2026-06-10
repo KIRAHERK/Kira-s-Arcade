@@ -118,6 +118,7 @@
       Distance <b id="finalDist">0</b> m<br>
       Coins 🪙 <span id="finalCoins">0</span> &nbsp;·&nbsp; Score <b id="finalScore">0</b>
       <div class="newbest hidden" id="newBest">★ NEW BEST! ★</div>
+      <div id="walletLine" style="margin-top:6px;color:#ffd166;font-size:14px;font-weight:700;"></div>
     </div>
     <button class="big-btn" id="retryBtn">RUN AGAIN</button>
     <a class="back-link" href="index.html">🎰 Lucky Spin</a> · <a class="back-link" href="candy.html">🍬 Candy</a> · <a class="back-link" href="blackjack.html">🃏 Blackjack</a> · <a class="back-link" href="stack.html">🏗️ Stack</a>
@@ -179,6 +180,16 @@
 
   /* ---------- Game state ---------- */
   const SAVE_KEY = "metroDashBest_v1";
+  /* ---- shared arcade wallet ---- */
+  const WALLET_KEY = "luckySpinSave_v1";
+  function walletAdd(n) {
+    let s = { balance: 1000, betIndex: 1, spins: 0, biggestWin: 0 };
+    try { const j = JSON.parse(localStorage.getItem(WALLET_KEY)); if (j && typeof j.balance === "number") s = Object.assign(s, j); } catch (e) {}
+    s.balance += n;
+    localStorage.setItem(WALLET_KEY, JSON.stringify(s));
+    return s.balance;
+  }
+
   let best = parseInt(localStorage.getItem(SAVE_KEY) || "0", 10) || 0;
 
   let mode = "menu";          // menu | play | over
@@ -631,6 +642,9 @@
 
   function showGameOver() {
     const score = Math.floor(dist + coins * 5);
+    const earned = Math.floor(coins * 2 + dist / 25);
+    const wbal = walletAdd(earned);
+    document.getElementById("walletLine").textContent = "+\u{1FA99} " + earned + " earned \u00b7 Wallet " + wbal.toLocaleString("en-US");
     document.getElementById("finalDist").textContent = Math.floor(dist);
     document.getElementById("finalCoins").textContent = coins;
     document.getElementById("finalScore").textContent = score;

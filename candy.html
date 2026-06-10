@@ -239,6 +239,7 @@
     <div class="stars" id="winStars">⭐⭐⭐</div>
     <h1>LEVEL CLEAR!</h1>
     <p>Score <b id="winScore">0</b></p>
+    <div id="winWallet" style="margin:-8px 0 14px;color:#ffd166;font-size:14px;font-weight:700;"></div>
     <button class="big-btn" id="nextBtn">NEXT LEVEL ➜</button>
   </div>
 </div>
@@ -247,6 +248,7 @@
   <div class="sheet">
     <h1>😵 OUT OF MOVES</h1>
     <p>You scored <b id="loseScore">0</b><br>so close — try again!</p>
+    <div id="loseWallet" style="margin:-8px 0 14px;color:#ffd166;font-size:14px;font-weight:700;"></div>
     <button class="big-btn" id="retryBtn">RETRY LEVEL</button>
   </div>
 </div>
@@ -257,6 +259,16 @@
 
   const ROWS = 8, COLS = 8, TYPES = 5;
   const SAVE_KEY = "candySmashLevel_v1";
+  /* ---- shared arcade wallet ---- */
+  const WALLET_KEY = "luckySpinSave_v1";
+  function walletAdd(n) {
+    let s = { balance: 1000, betIndex: 1, spins: 0, biggestWin: 0 };
+    try { const j = JSON.parse(localStorage.getItem(WALLET_KEY)); if (j && typeof j.balance === "number") s = Object.assign(s, j); } catch (e) {}
+    s.balance += n;
+    localStorage.setItem(WALLET_KEY, JSON.stringify(s));
+    return s.balance;
+  }
+
   const boardEl = document.getElementById("board");
   const movesEl = document.getElementById("movesEl");
   const levelEl = document.getElementById("levelEl");
@@ -727,6 +739,9 @@
     const over = Math.max(0, score - target);
     document.getElementById("winStars").textContent =
       over > target * 0.5 ? "⭐⭐⭐" : over > target * 0.2 ? "⭐⭐" : "⭐";
+    const earned = 50 + level * 20;
+    const wbal = walletAdd(earned);
+    document.getElementById("winWallet").textContent = "+\u{1FA99} " + earned + " earned \u00b7 Wallet " + wbal.toLocaleString("en-US");
     document.getElementById("winScore").textContent = score;
     document.getElementById("winOverlay").classList.remove("hidden");
     level++;
@@ -734,6 +749,9 @@
   }
   function loseLevel() {
     sfx.lose(); buzz(180);
+    const earnedL = Math.floor(score / 200);
+    const wbalL = walletAdd(earnedL);
+    document.getElementById("loseWallet").textContent = "+\u{1FA99} " + earnedL + " earned \u00b7 Wallet " + wbalL.toLocaleString("en-US");
     document.getElementById("loseScore").textContent = score;
     document.getElementById("loseOverlay").classList.remove("hidden");
   }

@@ -93,6 +93,7 @@
     <div class="result">
       Gates <b id="finalScore">0</b>
       <div class="newbest hidden" id="newBest">★ NEW BEST! ★</div>
+      <div id="walletLine" style="margin-top:6px;color:#ffd166;font-size:14px;font-weight:700;"></div>
     </div>
     <button class="big-btn" id="retryBtn">FLY AGAIN</button>
     <div class="links">
@@ -147,6 +148,16 @@
 
   /* ---- state ---- */
   const SAVE_KEY = "glowBirdBest_v1";
+  /* ---- shared arcade wallet ---- */
+  const WALLET_KEY = "luckySpinSave_v1";
+  function walletAdd(n) {
+    let s = { balance: 1000, betIndex: 1, spins: 0, biggestWin: 0 };
+    try { const j = JSON.parse(localStorage.getItem(WALLET_KEY)); if (j && typeof j.balance === "number") s = Object.assign(s, j); } catch (e) {}
+    s.balance += n;
+    localStorage.setItem(WALLET_KEY, JSON.stringify(s));
+    return s.balance;
+  }
+
   let best = parseInt(localStorage.getItem(SAVE_KEY) || "0", 10) || 0;
   const R = 15;             // bird radius
   const PW = 72;            // gate width
@@ -356,6 +367,9 @@
       localStorage.setItem(SAVE_KEY, String(best));
       document.getElementById("newBest").classList.remove("hidden");
     } else document.getElementById("newBest").classList.add("hidden");
+    const earned = score * 8;
+    const wbal = walletAdd(earned);
+    document.getElementById("walletLine").textContent = "+\u{1FA99} " + earned + " earned \u00b7 Wallet " + wbal.toLocaleString("en-US");
     document.getElementById("finalScore").textContent = score;
     bestEl.textContent = "BEST " + best;
     document.getElementById("gameover").classList.remove("hidden");
