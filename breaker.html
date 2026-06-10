@@ -240,7 +240,7 @@
   }
 
   function ballSpeed() {
-    const base = Math.min(385 + level * 34 + score * 0.08, 700);
+    const base = Math.min(510 + level * 42 + score * 0.08, 870);
     return gtime < fx.slowUntil ? base * 0.72 : base;
   }
   function scoreMult() { return gtime < fx.x2Until ? 2 : 1; }
@@ -347,7 +347,7 @@
     return "wide";
   }
   function spawnPerk(x, y, type) {
-    perks.push({ x, y, vy: 150 + level * 8, type: type || rollPerk() });
+    perks.push({ x, y, vy: 200 + level * 10, type: type || rollPerk() });
   }
   function applyPerk(type) {
     sfx.perk(); buzz([20, 20, 40]);
