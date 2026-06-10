@@ -198,12 +198,13 @@
   /* ---------- Footer / paytable ---------- */
   .footer-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     margin-top: 12px;
     width: min(92vw, 420px);
   }
   .ghost-btn {
-    flex: 1;
+    flex: 1 1 40%;
     padding: 11px;
     border-radius: 12px;
     border: 1px solid rgba(255,255,255,0.2);
@@ -357,6 +358,7 @@
   <button class="ghost-btn" id="paytableBtn">📋 Paytable</button>
   <button class="ghost-btn" onclick="location.href='runner.html'">🏃 Metro Dash</button>
   <button class="ghost-btn" onclick="location.href='candy.html'">🍬 Candy Smash</button>
+  <button class="ghost-btn" onclick="location.href='blackjack.html'">🃏 Blackjack</button>
   <button class="ghost-btn topup" id="topupBtn">🎁 Free 500 coins</button>
 </div>
 <div class="stats" id="stats"></div>
