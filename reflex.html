@@ -137,6 +137,17 @@
   .pad button:active { background: rgba(255,255,255,.22); }
   .typed { font-size: 28px; letter-spacing: 8px; min-height: 36px; font-weight: 900; }
   .oddgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; }
+  .mash-row { display: flex; gap: 16px; }
+  .mash-row .mash-btn { width: 130px; height: 130px; font-size: 30px; }
+  .stroop-word { font-size: 54px; font-weight: 900; letter-spacing: 3px; text-shadow: 0 0 24px currentColor; }
+  .ordgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+  .ordgrid button {
+    padding: 20px 0; border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.3);
+    background: rgba(255,255,255,.1);
+    color: #fff; font-size: 26px; font-weight: 900;
+  }
+  .ordgrid button:active { background: rgba(255,255,255,.22); }
   .oddgrid button {
     font-size: 34px; padding: 10px 0;
     background: rgba(255,255,255,.07);
@@ -173,7 +184,7 @@
 </head>
 <body>
 <div class="logo">⚡ REFLEX ROYALE</div>
-<div class="sub">8 lightning rounds · everyone plays at once · fastest fingers win<br>2–8 phones, one room code</div>
+<div class="sub">8 brutal lightning rounds · everyone plays at once · fastest fingers win<br>2–8 phones, one room code</div>
 <div id="app"></div>
 <div class="links"><a href="index.html">🏠 All games</a></div>
 
@@ -250,10 +261,12 @@
     const ri = (n) => Math.floor(Math.random() * n);
 
     function genSpec(roundNum) {
-      const types = ["reaction", "math", "mash", "memory", "odd"];
+      const types = ["reaction", "math", "mash", "memory", "odd", "stroop", "order"];
       const type = types[ri(types.length)];
       if (type === "reaction") {
-        return { type, rank: "asc", title: "⚡ REACTION", desc: "Tap the moment it turns GREEN. Tap early and you're out!", delay: 1600 + ri(2300) };
+        const delay = 1300 + ri(3200);
+        return { type, rank: "asc", title: "⚡ REACTION", desc: "Tap only when it turns GREEN — the fake flash will try to bait you!",
+          delay, fake: Math.random() < 0.55, fakeAt: 400 + ri(Math.max(300, delay - 1000)) };
       }
       if (type === "math") {
         const a = 3 + ri(7), b = 2 + ri(8), c = 2 + ri(8);
@@ -268,16 +281,30 @@
         return { type, rank: "asc", title: "🧮 QUICK MATH", desc: "First correct answer wins", q, correct, answers: [...answers].sort(() => Math.random() - 0.5) };
       }
       if (type === "mash") {
-        return { type, rank: "desc", title: "🔥 MASH!", desc: "Tap the button as fast as you can — 5 seconds", secs: 5 };
+        return { type, rank: "desc", title: "🔥 MASH!", desc: "Tap LEFT-RIGHT-LEFT-RIGHT — the same side twice in a row doesn't count!", secs: 4, alternate: true };
       }
       if (type === "memory") {
         let seq = "";
-        for (let i = 0; i < 5; i++) seq += ri(10);
-        return { type, rank: "asc", title: "🧠 MEMORY", desc: "Memorize the code, then type it back", seq };
+        for (let i = 0; i < 6; i++) seq += ri(10);
+        return { type, rank: "asc", title: "🧠 MEMORY", desc: "Six digits, one quick flash. Type it back", seq };
       }
-      const pairs = [["😺", "😸"], ["🌝", "🌚"], ["🟦", "🟪"], ["🍩", "🍪"], ["🐶", "🐺"], ["⭐", "🌟"]];
-      const [base, odd] = pairs[ri(pairs.length)];
-      return { type: "odd", rank: "asc", title: "👀 ODD ONE OUT", desc: "One is different. Find it. Fast.", base, odd, n: 20, idx: ri(20) };
+      if (type === "odd") {
+        const pairs = [["😀", "😃"], ["🌕", "🌝"], ["🐶", "🐺"], ["⭐", "🌟"], ["🟦", "🟪"], ["😺", "😸"]];
+        const [base, odd] = pairs[ri(pairs.length)];
+        return { type, rank: "asc", title: "👀 ODD ONE OUT", desc: "Thirty of them, one impostor. A wrong tap ends you", base, odd, n: 30, idx: ri(30) };
+      }
+      if (type === "stroop") {
+        const COLORS = [["RED", "#ff5d73"], ["BLUE", "#4dc3ff"], ["GREEN", "#3ddc84"], ["YELLOW", "#ffd54a"], ["PINK", "#ff8ccd"], ["ORANGE", "#ff8c5c"]];
+        const wi = ri(COLORS.length);
+        let ii = ri(COLORS.length);
+        while (ii === wi) ii = ri(COLORS.length);
+        const opts = new Set([COLORS[ii][0], COLORS[wi][0]]);
+        while (opts.size < 4) opts.add(COLORS[ri(COLORS.length)][0]);
+        return { type, rank: "asc", title: "🎨 COLOR TRAP", desc: "Tap the color of the INK — ignore what the word says! Wrong = out",
+          word: COLORS[wi][0], inkName: COLORS[ii][0], inkHex: COLORS[ii][1], options: [...opts].sort(() => Math.random() - 0.5) };
+      }
+      const layout = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
+      return { type: "order", rank: "asc", title: "🔢 1 TO 9", desc: "Tap the numbers in order — every misstap costs a second", layout };
     }
 
     E.start = () => {
@@ -524,6 +551,8 @@
       else if (spec.type === "math") runMath(head, spec);
       else if (spec.type === "mash") runMash(head, spec);
       else if (spec.type === "memory") runMemory(head, spec);
+      else if (spec.type === "stroop") runStroop(head, spec);
+      else if (spec.type === "order") runOrder(head, spec);
       else runOdd(head, spec);
     };
     showCount();
@@ -535,10 +564,25 @@
 
   function runReaction(head, spec) {
     let t0 = 0, green = false;
-    h(head + `<div class="arena red" id="zone"><div class="bigword">WAIT…</div></div>`);
-    arenaTap("zone", () => {
-      if (!green) { sBad(); buzz(100); h(head + `<div class="arena red"><div class="bigword">TOO SOON! 💀</div></div>`); submit(9999, false); }
-    });
+    const failEarly = () => {
+      if (green || submitted) return;
+      sBad(); buzz(100);
+      h(head + `<div class="arena red"><div class="bigword">TOO SOON! 💀</div></div>`);
+      submit(9999, false);
+    };
+    const showRed = (word) => {
+      if (green || submitted) return;
+      h(head + `<div class="arena red" id="zone"><div class="bigword">${word}</div></div>`);
+      arenaTap("zone", failEarly);
+    };
+    const showBait = () => {
+      if (green || submitted) return;
+      h(head + `<div class="arena" id="zone" style="background:#7a5212;border-color:#ffd54a"><div class="bigword">READY…?</div></div>`);
+      arenaTap("zone", failEarly);
+      after(320, () => showRed("WAIT…"));
+    };
+    showRed("WAIT…");
+    if (spec.fake && spec.fakeAt < spec.delay - 450) after(spec.fakeAt, showBait);
     after(spec.delay, () => {
       if (submitted) return;
       green = true;
@@ -579,13 +623,27 @@
   }
 
   function runMash(head, spec) {
-    let count = 0;
+    let count = 0, lastSide = null;
     h(head + `<div class="arena"><div class="mash-count" id="cnt">0</div>
-      <button class="mash-btn" id="mash">MASH!</button>
+      <div class="mash-row">
+        <button class="mash-btn" id="mashL">L</button>
+        <button class="mash-btn" id="mashR">R</button>
+      </div>
       <div class="waiting" id="left">${spec.secs}.0s</div></div>`);
+    const press = (side) => {
+      if (side === lastSide) { sBad(); buzz(30); return; }   // same side twice: no count
+      lastSide = side;
+      count++; sTap();
+      const c = document.getElementById("cnt");
+      if (c) c.textContent = count;
+      const a = document.getElementById("mash" + side), b = document.getElementById("mash" + (side === "L" ? "R" : "L"));
+      if (a) a.style.opacity = ".35";
+      if (b) b.style.opacity = "1";
+    };
     setTimeout(() => {
-      const el = document.getElementById("mash");
-      if (el) el.onpointerdown = () => { count++; sTap(); document.getElementById("cnt").textContent = count; };
+      const l = document.getElementById("mashL"), r = document.getElementById("mashR");
+      if (l) l.onpointerdown = () => press("L");
+      if (r) r.onpointerdown = () => press("R");
     }, 0);
     const t0 = performance.now();
     const tick = () => {
@@ -600,7 +658,7 @@
 
   function runMemory(head, spec) {
     h(head + `<div class="arena"><div class="seq">${spec.seq}</div></div>`);
-    after(1600, () => {
+    after(1100, () => {
       if (submitted) return;
       const t0 = performance.now();
       let typed = "";
@@ -628,7 +686,8 @@
     const t0 = performance.now();
     const cells = [];
     for (let i = 0; i < spec.n; i++) cells.push(i === spec.idx ? spec.odd : spec.base);
-    h(head + `<div class="arena"><div class="oddgrid">${cells.map((e, i) => `<button id="od${i}">${e}</button>`).join("")}</div></div>`);
+    const cols = spec.n > 24 ? 5 : 4;
+    h(head + `<div class="arena"><div class="oddgrid" style="grid-template-columns:repeat(${cols},1fr)">${cells.map((e, i) => `<button id="od${i}" style="font-size:${spec.n > 24 ? 26 : 34}px">${e}</button>`).join("")}</div></div>`);
     cells.forEach((e, i) => {
       setTimeout(() => {
         const el = document.getElementById("od" + i);
@@ -637,6 +696,51 @@
           ensureAudio();
           if (i === spec.idx) { sGood(); buzz(20); submit(Math.round(performance.now() - t0), true); }
           else { sBad(); buzz(100); submit(9999, false); }
+        };
+      }, 0);
+    });
+  }
+
+  function runStroop(head, spec) {
+    const t0 = performance.now();
+    h(head + `<div class="arena"><div class="stroop-word" style="color:${spec.inkHex}">${spec.word}</div>
+      <div class="answers">${spec.options.map((o, i) => `<button class="ans" id="st${i}" style="font-size:17px">${o}</button>`).join("")}</div></div>`);
+    spec.options.forEach((o, i) => {
+      setTimeout(() => {
+        const el = document.getElementById("st" + i);
+        if (!el) return;
+        el.onclick = () => {
+          ensureAudio();
+          if (o === spec.inkName) { sGood(); buzz(20); submit(Math.round(performance.now() - t0), true); }
+          else { sBad(); buzz(100); submit(9999, false); }
+        };
+      }, 0);
+    });
+  }
+
+  function runOrder(head, spec) {
+    const t0 = performance.now();
+    let next = 1, penalty = 0;
+    h(head + `<div class="arena"><div class="ordgrid">${spec.layout.map((d, i) => `<button id="og${i}">${d}</button>`).join("")}</div>
+      <div class="waiting" id="ogp"></div></div>`);
+    spec.layout.forEach((d, i) => {
+      setTimeout(() => {
+        const el = document.getElementById("og" + i);
+        if (!el) return;
+        el.onclick = () => {
+          ensureAudio();
+          if (d === next) {
+            sTap();
+            el.style.opacity = ".2";
+            el.disabled = true;
+            next++;
+            if (next > 9) { sGood(); buzz(20); submit(Math.round(performance.now() - t0 + penalty), true); }
+          } else {
+            sBad(); buzz(60);
+            penalty += 1000;
+            const p = document.getElementById("ogp");
+            if (p) p.textContent = "+" + (penalty / 1000) + "s penalty";
+          }
         };
       }, 0);
     });
