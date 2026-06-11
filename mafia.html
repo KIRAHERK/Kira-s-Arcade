@@ -311,7 +311,7 @@
     const bcast = (msg) => { for (const p of E.players) if (!p.gone) send(p.id, msg); };
 
     function rolesFor(n) {
-      const mafia = Math.max(1, Math.floor(n / 3));
+      const mafia = n >= 6 ? 2 : 1;   // capped at two mafia, and only with 6+ players
       const roles = [];
       for (let i = 0; i < mafia; i++) roles.push("mafia");
       roles.push("detective");
