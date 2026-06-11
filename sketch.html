@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a0f2e">
+<title>Sketch & Guess 🎨</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+  body {
+    min-height: 100%;
+    font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(120% 100% at 50% 0%, #34205c 0%, #1a0f2e 60%, #0a0617 100%);
+    background-attachment: fixed;
+    color: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+  }
+  .logo {
+    font-size: 28px; font-weight: 900; letter-spacing: 2px; margin-top: 2px;
+    background: linear-gradient(180deg, #ffe9f7, #ff8ccd 45%, #b06dff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 26px rgba(255, 140, 205, .3);
+  }
+  .sub { font-size: 12.5px; opacity: .6; margin: 4px 0 14px; text-align: center; line-height: 1.5; }
+  #app { width: min(96vw, 430px); display: flex; flex-direction: column; gap: 10px; }
+
+  .box {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 18px;
+    padding: 16px;
+  }
+  .box h2 { font-size: 13px; letter-spacing: 2px; opacity: .65; margin-bottom: 12px; font-weight: 700; }
+  input {
+    width: 100%; padding: 13px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.25);
+    background: rgba(0,0,0,.35); color: #fff;
+    font-size: 17px; font-weight: 600; text-align: center;
+    outline: none; margin-bottom: 10px;
+  }
+  input::placeholder { color: rgba(255,255,255,.35); }
+  .btn {
+    width: 100%; padding: 14px; border: none; border-radius: 14px;
+    font-size: 16px; font-weight: 800; letter-spacing: 1.5px;
+    color: #fff;
+    background: linear-gradient(180deg, #d9a8ff, #b06dff 55%, #7a36cc);
+    box-shadow: 0 5px 0 #471a80;
+  }
+  .btn.alt { background: linear-gradient(180deg, #9be8c0, #3ddc84 55%, #1f9c5b); box-shadow: 0 5px 0 #11603a; color: #06250f; }
+  .btn.ghost { background: rgba(255,255,255,.1); box-shadow: none; border: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 13px; padding: 10px; }
+  .btn:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+  .btn + .btn { margin-top: 10px; }
+
+  .code-big {
+    font-size: 42px; font-weight: 900; letter-spacing: 12px;
+    text-align: center; color: #ff8ccd;
+    text-shadow: 0 0 22px rgba(255,140,205,.5);
+    margin: 6px 0 2px;
+  }
+  .code-hint { text-align: center; font-size: 12px; opacity: .6; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip {
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 14px; font-weight: 700;
+  }
+  .chip.me { border-color: #ff8ccd; color: #ff8ccd; }
+
+  .turn-head { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 800; opacity: .8; }
+  .mask {
+    text-align: center; font-size: 26px; font-weight: 900; letter-spacing: 7px;
+    color: #ffd54a; min-height: 34px;
+    text-shadow: 0 0 14px rgba(255,213,74,.4);
+  }
+  .timebar-wrap { background: rgba(0,0,0,.4); border-radius: 999px; height: 9px; overflow: hidden; }
+  .timebar { height: 100%; background: linear-gradient(90deg, #3ddc84, #ffd54a); border-radius: 999px; transition: width 1s linear; }
+
+  #cv {
+    display: block;
+    width: 100%;
+    background: #fdfdf6;
+    border-radius: 14px;
+    touch-action: none;
+    border: 2px solid rgba(255,255,255,.25);
+  }
+  .tools { display: flex; gap: 7px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  .swatch {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid transparent;
+  }
+  .swatch.sel { border-color: #fff; transform: scale(1.12); }
+  .tool-btn {
+    padding: 8px 12px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.3);
+    background: rgba(255,255,255,.1); color: #fff;
+    font-size: 13px; font-weight: 700;
+  }
+  .tool-btn:active { background: rgba(255,255,255,.25); }
+
+  .guessrow { display: flex; gap: 8px; }
+  .guessrow input { margin-bottom: 0; text-align: left; padding: 12px; font-size: 16px; }
+  .guessrow button {
+    padding: 0 18px; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 800; color: #06250f;
+    background: linear-gradient(180deg, #9be8c0, #3ddc84 55%, #1f9c5b);
+    box-shadow: 0 4px 0 #11603a;
+  }
+  .guessrow button:active { transform: translateY(2px); box-shadow: 0 2px 0 #11603a; }
+  .feed { font-size: 13px; line-height: 1.8; min-height: 44px; max-height: 110px; overflow-y: auto; }
+  .feed .ok { color: #3ddc84; font-weight: 800; }
+  .feed .close { color: #ffd54a; font-weight: 700; }
+  .feed b { opacity: .9; }
+  .youword { text-align: center; font-size: 15px; font-weight: 800; color: #ffd54a; }
+
+  .board { display: flex; flex-direction: column; gap: 8px; }
+  .brow {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    padding: 10px 12px;
+    position: relative; overflow: hidden;
+  }
+  .brow .bar { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,140,205,.12); }
+  .brow .medal { font-size: 19px; width: 28px; text-align: center; z-index: 1; }
+  .brow .bname { flex: 1; font-weight: 800; font-size: 15px; z-index: 1; }
+  .brow .bpts { font-weight: 900; color: #ffd54a; z-index: 1; }
+  .brow .bdelta { font-size: 12px; color: #3ddc84; font-weight: 800; z-index: 1; width: 44px; text-align: right; }
+  .brow.me { border-color: #ff8ccd; }
+  .reveal-word { text-align: center; font-size: 24px; font-weight: 900; color: #ffd54a; letter-spacing: 2px; padding: 8px; }
+  .champ { text-align: center; font-size: 20px; font-weight: 900; padding: 14px; border-radius: 14px;
+    background: rgba(255,140,205,.12); border: 1px solid #ff8ccd; line-height: 1.5; }
+  .choice-grid { display: flex; flex-direction: column; gap: 10px; }
+  .waiting { text-align: center; font-size: 14px; opacity: .7; padding: 8px; }
+  .pulse { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .links { margin-top: 12px; font-size: 13px; text-align: center; }
+  .links a { color: rgba(255,255,255,.65); text-decoration: underline; }
+  .err { color: #ff8a8a; font-size: 13px; text-align: center; min-height: 18px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="logo">🎨 SKETCH & GUESS</div>
+<div class="sub">one of you draws, everyone races to guess<br>2–8 phones, one room code (3+ is best)</div>
+<div id="app"></div>
+<div class="links"><a href="index.html">🏠 All games</a></div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ---- audio ---- */
+  let actx = null;
+  function ensureAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    if (actx && actx.state === "suspended") actx.resume();
+  }
+  function tone(f1, f2, dur, type, vol, when = 0) {
+    if (!actx) return;
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f1, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(f2, 1), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  const sClick = () => tone(500, 460, 0.05, "square", 0.03);
+  const sWhoosh = () => { tone(300, 900, 0.25, "sine", 0.05); };
+  const sDing = () => { tone(784, 1047, 0.12, "triangle", 0.06); tone(1047, 1319, 0.16, "triangle", 0.05, 0.1); };
+  const sClose = () => tone(587, 622, 0.15, "triangle", 0.05);
+  const sWrong = () => tone(240, 200, 0.1, "square", 0.025);
+  const sTick = () => tone(1000, 980, 0.04, "square", 0.035);
+  const sReveal = () => [523, 659, 784].forEach((f, i) => tone(f, f, 0.13, "triangle", 0.05, i * 0.09));
+  const sChamp = () => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, f, 0.2, "triangle", 0.06, i * 0.13));
+  const sHint = () => tone(880, 1100, 0.12, "sine", 0.045);
+  const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
+
+  /* =====================================================
+     WORD BANK — drawable nouns
+     ===================================================== */
+  const WORDS = ("cat,dog,fish,bird,snake,elephant,giraffe,lion,monkey,rabbit,turtle,spider,bee,butterfly,shark,whale,octopus,penguin,camel,horse," +
+    "pizza,burger,ice cream,banana,apple,grapes,carrot,cake,donut,cookie,egg,cheese,popcorn,watermelon,corn,mushroom,bread,candy,coffee,tea," +
+    "house,castle,bridge,tent,lighthouse,windmill,pyramid,igloo,barn,skyscraper,church,mosque,school,hospital,prison,factory,stadium,fountain,tower,maze," +
+    "car,bus,train,airplane,helicopter,rocket,boat,submarine,bicycle,motorcycle,truck,tractor,ambulance,skateboard,balloon,parachute,anchor,sailboat,scooter,ufo," +
+    "guitar,piano,drums,violin,trumpet,microphone,bell,whistle,radio,television,camera,telephone,computer,robot,clock,lamp,candle,key,lock,ladder," +
+    "sun,moon,star,cloud,rain,rainbow,lightning,snowman,volcano,island,mountain,beach,river,tree,flower,cactus,leaf,fire,tornado,wave," +
+    "king,queen,clown,pirate,ninja,wizard,ghost,angel,mermaid,cowboy,astronaut,doctor,chef,police,farmer,vampire,zombie,knight,baby,giant," +
+    "glasses,hat,crown,shoe,sock,glove,scarf,umbrella,backpack,ring,necklace,watch,mask,belt,dress,boot,button,zipper,pocket,tie," +
+    "scissors,hammer,saw,axe,broom,bucket,rope,net,cage,fence,mirror,pillow,blanket,toothbrush,soap,comb,spoon,fork,knife,plate," +
+    "football,basketball,tennis,golf,bowling,boxing,fishing,swimming,dancing,sleeping,running,jumping,crying,laughing,singing,reading,painting,cooking,driving,flying").split(",");
+
+  /* =====================================================
+     GAME ENGINE (host-side, transport-agnostic, testable)
+     ===================================================== */
+  function createSketchEngine(send) {
+    const E = {
+      players: [],        // {id, name, score, gone}
+      phase: "lobby",     // lobby | choose | draw | turnEnd
+      turn: 0,
+      TOTAL: 0,
+      drawer: null,
+      word: null,
+      mask: null,         // [{ch, shown}]
+      choices: null,
+      guessed: null,      // {name: true}
+      deltas: null,       // {name: points this turn}
+    };
+    const alive = () => E.players.filter((p) => !p.gone);
+    const bcast = (msg) => { for (const p of alive()) send(p.id, msg); };
+    const ri = (n) => Math.floor(Math.random() * n);
+
+    E.addPlayer = (id, name) => {
+      if (E.phase !== "lobby" || E.players.length >= 8) return false;
+      let n = (name || "Player").trim().slice(0, 14) || "Player";
+      let base = n, k = 2;
+      while (E.players.some((p) => p.name === n)) n = base + " " + k++;
+      E.players.push({ id, name: n, score: 0, gone: false });
+      sendLobby();
+      return n;
+    };
+    E.removePlayer = (id) => {
+      const p = E.players.find((x) => x.id === id);
+      if (!p) return;
+      if (E.phase === "lobby") { E.players = E.players.filter((x) => x.id !== id); sendLobby(); return; }
+      p.gone = true;
+      if ((E.phase === "choose" || E.phase === "draw") && E.drawer === p) E.endTurn();
+      else if (E.phase === "draw") maybeAllGuessed();
+    };
+    function sendLobby() {
+      if (E.phase !== "lobby") return;
+      bcast({ t: "lobby", players: E.players.map((p) => p.name), canStart: E.players.length >= 2 });
+    }
+    E.sendLobby = sendLobby;
+
+    E.start = () => {
+      if (E.phase !== "lobby" || E.players.length < 2) return false;
+      for (const p of E.players) p.score = 0;
+      E.turn = 0;
+      E.TOTAL = alive().length * 2;     // everyone draws twice
+      nextTurn();
+      return true;
+    };
+
+    function nextTurn() {
+      E.turn++;
+      E.phase = "choose";
+      const a = alive();
+      E.drawer = a[(E.turn - 1) % a.length];
+      E.word = null; E.mask = null;
+      E.guessed = {}; E.deltas = {};
+      const set = new Set();
+      while (set.size < 3) set.add(WORDS[ri(WORDS.length)]);
+      E.choices = [...set];
+      bcast({ t: "turnSetup", drawer: E.drawer.name, turn: E.turn, total: E.TOTAL });
+      send(E.drawer.id, { t: "choices", words: E.choices });
+    }
+
+    const maskStr = () => E.mask.map((m) => (m.shown ? m.ch : "_")).join("");
+
+    E.pickWord = (id, word) => {
+      if (E.phase !== "choose" || !E.drawer || E.drawer.id !== id) return;
+      if (!E.choices.includes(word)) return;
+      beginDraw(word);
+    };
+    E.forcePick = () => {     // host safety: drawer idle
+      if (E.phase !== "choose") return;
+      beginDraw(E.choices[0]);
+    };
+    function beginDraw(word) {
+      E.word = word.toLowerCase();
+      E.mask = E.word.split("").map((ch) => ({ ch, shown: !/[a-z]/.test(ch) }));
+      E.phase = "draw";
+      bcast({ t: "turnStart", drawer: E.drawer.name, mask: maskStr(), seconds: 75, turn: E.turn, total: E.TOTAL });
+      send(E.drawer.id, { t: "yourWord", word: E.word });
+    }
+
+    E.strokeFrom = (id, data) => {
+      if (E.phase !== "draw" || !E.drawer || E.drawer.id !== id) return;
+      for (const p of alive()) if (p.id !== id) send(p.id, { t: "draw", d: data });
+    };
+
+    function lev1(a, b) {            // edit distance <= 1?
+      if (a === b) return true;
+      if (Math.abs(a.length - b.length) > 1) return false;
+      let i = 0, j = 0, edits = 0;
+      while (i < a.length && j < b.length) {
+        if (a[i] === b[j]) { i++; j++; continue; }
+        if (++edits > 1) return false;
+        if (a.length > b.length) i++;
+        else if (b.length > a.length) j++;
+        else { i++; j++; }
+      }
+      return edits + (a.length - i) + (b.length - j) <= 1;
+    }
+
+    E.guess = (id, text, secondsLeft) => {
+      if (E.phase !== "draw") return;
+      const p = E.players.find((x) => x.id === id);
+      if (!p || p.gone || p === E.drawer || E.guessed[p.name]) return;
+      const clean = String(text || "").trim().toLowerCase();
+      if (!clean) return;
+      if (clean === E.word) {
+        E.guessed[p.name] = true;
+        const pts = 100 + Math.round(Math.max(0, Number(secondsLeft) || 0) * 4);
+        p.score += pts;
+        E.deltas[p.name] = (E.deltas[p.name] || 0) + pts;
+        E.drawer.score += 30;
+        E.deltas[E.drawer.name] = (E.deltas[E.drawer.name] || 0) + 30;
+        bcast({ t: "feed", name: p.name, correct: true });
+        send(p.id, { t: "youGot", pts });
+        maybeAllGuessed();
+      } else if (lev1(clean, E.word)) {
+        send(p.id, { t: "feed", close: true, text: clean });
+      } else {
+        bcast({ t: "feed", name: p.name, text: clean.slice(0, 24) });
+      }
+    };
+    function maybeAllGuessed() {
+      if (E.phase !== "draw") return;
+      const guessers = alive().filter((p) => p !== E.drawer);
+      if (guessers.length && guessers.every((p) => E.guessed[p.name])) E.endTurn();
+    }
+
+    E.revealHint = () => {
+      if (E.phase !== "draw") return;
+      const hidden = E.mask.filter((m) => !m.shown);
+      if (hidden.length <= 1) return;       // never reveal the whole word
+      hidden[ri(hidden.length)].shown = true;
+      bcast({ t: "hint", mask: maskStr() });
+    };
+
+    E.endTurn = () => {
+      if (E.phase !== "draw" && E.phase !== "choose") return;
+      E.phase = "turnEnd";
+      const board = [...alive()].sort((a, b) => b.score - a.score).map((p) => ({
+        name: p.name, total: p.score, delta: E.deltas[p.name] || 0, drew: p === E.drawer,
+      }));
+      bcast({ t: "turnEnd", word: E.word || E.choices[0], board, turn: E.turn, total: E.TOTAL, final: E.turn >= E.TOTAL });
+    };
+
+    E.next = () => {
+      if (E.phase !== "turnEnd" || E.turn >= E.TOTAL) return;
+      nextTurn();
+    };
+    E.playAgain = () => {
+      if (E.phase !== "turnEnd" || E.turn < E.TOTAL) return;
+      E.phase = "lobby";
+      E.players = E.players.filter((p) => !p.gone);
+      for (const p of E.players) p.score = 0;
+      sendLobby();
+    };
+
+    return E;
+  }
+  window.__sketchEngine = createSketchEngine;
+
+  /* =====================================================
+     CLIENT UI
+     ===================================================== */
+  const app = document.getElementById("app");
+  let peer = null, hostConns = {}, clientConn = null;
+  let isHost = false, myName = "";
+  let engine = null;
+  let timers = [];
+  let curTurn = null;     // {drawer, mask, seconds, turn, total, iDraw, word?}
+  let feed = [];
+  let secondsLeft = 0, countdown = null;
+  let strokes = [];       // [{c, w, pts:[[x,y]..]}] normalized 0..1
+  let liveStroke = null;
+
+  function h(html) { app.innerHTML = html; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; clearInterval(countdown); countdown = null; }
+  function after(ms, fn) { timers.push(setTimeout(fn, ms)); }
+
+  const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  function makeCode() {
+    let c = "";
+    for (let i = 0; i < 4; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return c;
+  }
+  const peerId = (code) => "kira-sketch-" + code.toLowerCase();
+
+  function hostGame(name) {
+    myName = name;
+    isHost = true;
+    showWait("Setting up your room…");
+    const code = makeCode();
+    peer = new Peer(peerId(code));
+    peer.on("open", () => {
+      engine = createSketchEngine((pid, msg) => {
+        if (pid === "host") handleMsg(msg);
+        else if (hostConns[pid]) try { hostConns[pid].send(msg); } catch (e) {}
+      });
+      engine.code = code;
+      myName = engine.addPlayer("host", name);
+      peer.on("connection", (conn) => {
+        conn.on("data", (msg) => {
+          if (!msg || typeof msg !== "object") return;
+          if (msg.t === "join") { hostConns[conn.peer] = conn; engine.addPlayer(conn.peer, msg.name); }
+          else if (msg.t === "pick") engine.pickWord(conn.peer, msg.word);
+          else if (msg.t === "draw") engine.strokeFrom(conn.peer, msg.d);
+          else if (msg.t === "guess") engine.guess(conn.peer, msg.text, msg.left);
+        });
+        conn.on("close", () => { delete hostConns[conn.peer]; engine.removePlayer(conn.peer); });
+      });
+      engine.sendLobby();
+    });
+    peer.on("error", (e) => showHome("Couldn't create room (" + e.type + "). Try again."));
+  }
+
+  function joinGame(code, name) {
+    myName = name;
+    isHost = false;
+    showWait("Joining room " + code.toUpperCase() + "…");
+    peer = new Peer();
+    peer.on("open", () => {
+      clientConn = peer.connect(peerId(code), { reliable: true });
+      let opened = false;
+      clientConn.on("open", () => { opened = true; clientConn.send({ t: "join", name }); });
+      clientConn.on("data", (msg) => handleMsg(msg));
+      clientConn.on("close", () => showHome("Connection lost. Rejoin with the room code."));
+      setTimeout(() => { if (!opened) showHome("Room not found — check the code (host must keep their screen on)."); }, 9000);
+    });
+    peer.on("error", (e) => {
+      if (e.type === "peer-unavailable") showHome("Room not found — check the code (host must keep their screen on).");
+      else showHome("Connection error (" + e.type + ").");
+    });
+  }
+
+  const toHost = (msg) => {
+    if (isHost) {
+      if (msg.t === "pick") engine.pickWord("host", msg.word);
+      else if (msg.t === "draw") engine.strokeFrom("host", msg.d);
+      else if (msg.t === "guess") engine.guess("host", msg.text, msg.left);
+    } else if (clientConn) clientConn.send(msg);
+  };
+
+  /* ---- host-side turn clock: countdown, hints, end ---- */
+  function hostRunTurnClock() {
+    if (!isHost) return;
+    let left = 75;
+    after(35000, () => engine.revealHint());
+    after(55000, () => engine.revealHint());
+    hostTurnIv = setInterval(() => {
+      left--;
+      if (left <= 0) { stopHostClock(); engine.endTurn(); }
+    }, 1000);
+  }
+  let hostTurnIv = null;
+  function stopHostClock() { if (hostTurnIv) { clearInterval(hostTurnIv); hostTurnIv = null; } }
+
+  /* ---- message handling ---- */
+  function handleMsg(msg) {
+    if (msg.t === "lobby") { clearTimers(); stopHostClock(); renderLobby(msg); }
+    else if (msg.t === "turnSetup") {
+      clearTimers(); stopHostClock();
+      curTurn = { drawer: msg.drawer, turn: msg.turn, total: msg.total, iDraw: msg.drawer === myName, choices: null };
+      feed = []; strokes = []; liveStroke = null;
+      if (isHost) after(12000, () => engine.forcePick());
+      renderChoose();
+    }
+    else if (msg.t === "choices") { curTurn.choices = msg.words; renderChoose(); }
+    else if (msg.t === "turnStart") {
+      clearTimers(); stopHostClock();
+      sWhoosh(); buzz(20);
+      curTurn = { drawer: msg.drawer, mask: msg.mask, turn: msg.turn, total: msg.total, iDraw: msg.drawer === myName, word: curTurn && curTurn.word };
+      strokes = []; liveStroke = null; feed = [];
+      secondsLeft = msg.seconds;
+      renderDraw();
+      countdown = setInterval(() => {
+        secondsLeft--;
+        const bar = document.getElementById("tbar");
+        if (bar) bar.style.width = Math.max(0, (secondsLeft / 75) * 100) + "%";
+        const tl = document.getElementById("tleft");
+        if (tl) tl.textContent = secondsLeft + "s";
+        if (secondsLeft <= 10 && secondsLeft > 0) sTick();
+        if (secondsLeft <= 0) clearInterval(countdown);
+      }, 1000);
+      if (isHost) hostRunTurnClock();
+    }
+    else if (msg.t === "yourWord") { if (curTurn) { curTurn.word = msg.word; const el = document.getElementById("yw"); if (el) el.textContent = "draw: " + msg.word.toUpperCase(); } }
+    else if (msg.t === "draw") applyRemote(msg.d);
+    else if (msg.t === "hint") { sHint(); if (curTurn) { curTurn.mask = msg.mask; const el = document.getElementById("mask"); if (el) el.textContent = spacedMask(); } }
+    else if (msg.t === "feed") {
+      if (msg.correct) { sDing(); feed.push(`<span class="ok">✅ ${esc(msg.name)} guessed it!</span>`); }
+      else if (msg.close) { sClose(); feed.push(`<span class="close">🔥 "${esc(msg.text)}" is SO close!</span>`); }
+      else { sWrong(); feed.push(`<b>${esc(msg.name)}:</b> ${esc(msg.text)}`); }
+      const f = document.getElementById("feed");
+      if (f) { f.innerHTML = feed.slice(-7).join("<br>"); f.scrollTop = f.scrollHeight; }
+    }
+    else if (msg.t === "youGot") {
+      buzz([30, 20, 60]);
+      const g = document.getElementById("guessbox");
+      if (g) g.innerHTML = `<div class="youword">🎉 +${msg.pts} points! Watch the others sweat…</div>`;
+    }
+    else if (msg.t === "turnEnd") {
+      clearTimers(); stopHostClock();
+      (msg.final ? sChamp : sReveal)();
+      buzz(msg.final ? [60, 40, 60, 40, 140] : 30);
+      renderTurnEnd(msg);
+    }
+  }
+
+  const spacedMask = () => (curTurn && curTurn.mask ? curTurn.mask.split("").join(" ") : "");
+
+  function hostBtn(label, fn, extra) {
+    const id = "hb" + Math.random().toString(36).slice(2, 8);
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.onclick = () => { ensureAudio(); sClick(); fn(); };
+    }, 0);
+    return `<button class="btn ${extra || ""}" id="${id}">${label}</button>`;
+  }
+
+  function showHome(err) {
+    clearTimers(); stopHostClock();
+    h(`
+      <div class="box">
+        <h2>YOUR NAME</h2>
+        <input id="nameIn" maxlength="14" placeholder="e.g. Kira" autocomplete="off">
+        <div class="err">${err ? esc(err) : ""}</div>
+        ${hostBtn("HOST A GAME", () => {
+          const n = document.getElementById("nameIn").value.trim();
+          if (!n) return showHome("Enter a name first!");
+          if (typeof Peer === "undefined") return showHome("Couldn't load the network library — check your internet.");
+          hostGame(n);
+        })}
+      </div>
+      <div class="box">
+        <h2>OR JOIN A ROOM</h2>
+        <input id="codeIn" maxlength="4" placeholder="CODE" style="letter-spacing:8px;text-transform:uppercase" autocomplete="off">
+        ${hostBtn("JOIN", () => {
+          const n = document.getElementById("nameIn").value.trim();
+          const c = document.getElementById("codeIn").value.trim();
+          if (!n) return showHome("Enter a name first!");
+          if (c.length !== 4) return showHome("Room codes are 4 letters.");
+          if (typeof Peer === "undefined") return showHome("Couldn't load the network library — check your internet.");
+          joinGame(c, n);
+        }, "alt")}
+      </div>
+    `);
+  }
+  function showWait(text) { h(`<div class="box waiting pulse">${esc(text)}</div>`); }
+
+  function renderLobby(msg) {
+    h(`
+      ${isHost ? `<div class="box" style="text-align:center">
+        <h2>ROOM CODE — tell your friends</h2>
+        <div class="code-big">${engine.code}</div>
+        <div class="code-hint">they open this page → JOIN → type the code<br>keep this screen ON while they join</div>
+      </div>` : ""}
+      <div class="box">
+        <h2>ARTISTS (${msg.players.length}/8)</h2>
+        <div class="chips">${msg.players.map((p) => `<span class="chip ${p === myName ? "me" : ""}">${esc(p)}</span>`).join("")}</div>
+      </div>
+      ${isHost
+        ? (msg.canStart ? hostBtn("START DRAWING 🎨", () => engine.start()) : `<div class="waiting pulse">need at least 2 players…</div>`)
+        : `<div class="waiting pulse">waiting for the host to start…</div>`}
+    `);
+  }
+
+  function renderChoose() {
+    const head = `<div class="turn-head"><span>TURN ${curTurn.turn}/${curTurn.total}</span><span>🖌️ ${esc(curTurn.drawer)} draws</span></div>`;
+    if (curTurn.iDraw && curTurn.choices) {
+      const btns = curTurn.choices.map((w) => {
+        const id = "wc" + Math.random().toString(36).slice(2, 8);
+        setTimeout(() => {
+          const el = document.getElementById(id);
+          if (el) el.onclick = () => { ensureAudio(); sClick(); toHost({ t: "pick", word: w }); };
+        }, 0);
+        return `<button class="btn ghost" id="${id}" style="font-size:17px;padding:15px">${esc(w.toUpperCase())}</button>`;
+      }).join("");
+      h(head + `<div class="box"><h2>PICK YOUR WORD — you'll draw it</h2><div class="choice-grid">${btns}</div></div>`);
+    } else if (curTurn.iDraw) {
+      h(head + `<div class="box waiting pulse">getting your words…</div>`);
+    } else {
+      h(head + `<div class="box waiting pulse">🖌️ ${esc(curTurn.drawer)} is choosing a word…</div>` +
+        (isHost ? hostBtn("⏭ force pick (stuck?)", () => engine.forcePick(), "ghost") : ""));
+    }
+  }
+
+  /* ---- drawing canvas ---- */
+  const COLORS = ["#16161d", "#e74c3c", "#2979ff", "#1f9c5b", "#f4a127", "#b06dff"];
+  const ERASER = "#fdfdf6";
+  let penColor = COLORS[0], penWidth = 0.012;
+
+  function cvEl() { return document.getElementById("cv"); }
+  function cvCtx() { const c = cvEl(); return c ? c.getContext("2d") : null; }
+  function sizeCanvas() {
+    const c = cvEl();
+    if (!c) return;
+    const w = c.clientWidth;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    c.width = w * dpr;
+    c.height = w * 1.15 * dpr;
+    c.style.height = (w * 1.15) + "px";
+    redraw();
+  }
+  function drawSeg(ctx, c, s) {
+    const W = c.width;
+    ctx.strokeStyle = s.c;
+    ctx.lineWidth = Math.max(2, s.w * W);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    const pts = s.pts;
+    if (pts.length === 1) {
+      ctx.arc(pts[0][0] * W, pts[0][1] * W * 1.15, ctx.lineWidth / 2, 0, 7);
+      ctx.fillStyle = s.c; ctx.fill();
+      return;
+    }
+    ctx.moveTo(pts[0][0] * W, pts[0][1] * W * 1.15);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0] * W, pts[i][1] * W * 1.15);
+    ctx.stroke();
+  }
+  function redraw() {
+    const c = cvEl(), ctx = cvCtx();
+    if (!ctx) return;
+    ctx.clearRect(0, 0, c.width, c.height);
+    for (const s of strokes) drawSeg(ctx, c, s);
+    if (liveStroke) drawSeg(ctx, c, liveStroke);
+  }
+  function applyRemote(d) {
+    if (d.a === "start") { liveStroke = { c: d.c, w: d.w, pts: [d.p] }; }
+    else if (d.a === "pts" && liveStroke) { liveStroke.pts.push(...d.p); }
+    else if (d.a === "end") { if (liveStroke) { strokes.push(liveStroke); liveStroke = null; } }
+    else if (d.a === "undo") { strokes.pop(); liveStroke = null; }
+    else if (d.a === "clear") { strokes = []; liveStroke = null; }
+    redraw();
+  }
+
+  function bindDrawing() {
+    const c = cvEl();
+    if (!c) return;
+    let drawing = false, buffer = [], flushIv = null;
+    const norm = (e) => {
+      const r = c.getBoundingClientRect();
+      return [Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
+              Math.max(0, Math.min(1, (e.clientY - r.top) / (r.width * 1.15)))];
+    };
+    const flush = () => {
+      if (buffer.length) { toHost({ t: "draw", d: { a: "pts", p: buffer } }); buffer = []; }
+    };
+    c.onpointerdown = (e) => {
+      e.preventDefault();
+      c.setPointerCapture(e.pointerId);
+      drawing = true;
+      const p = norm(e);
+      liveStroke = { c: penColor, w: penWidth, pts: [p] };
+      toHost({ t: "draw", d: { a: "start", c: penColor, w: penWidth, p } });
+      flushIv = setInterval(flush, 60);
+      redraw();
+    };
+    c.onpointermove = (e) => {
+      if (!drawing) return;
+      const p = norm(e);
+      liveStroke.pts.push(p);
+      buffer.push(p);
+      redraw();
+    };
+    const up = () => {
+      if (!drawing) return;
+      drawing = false;
+      clearInterval(flushIv);
+      flush();
+      strokes.push(liveStroke);
+      liveStroke = null;
+      toHost({ t: "draw", d: { a: "end" } });
+    };
+    c.onpointerup = up;
+    c.onpointercancel = up;
+  }
+
+  function renderDraw() {
+    const head = `
+      <div class="turn-head"><span>TURN ${curTurn.turn}/${curTurn.total}</span><span id="tleft">75s</span></div>
+      <div class="timebar-wrap"><div class="timebar" id="tbar" style="width:100%"></div></div>
+      <div class="mask" id="mask">${curTurn.iDraw ? "" : spacedMask()}</div>
+      ${curTurn.iDraw ? `<div class="youword" id="yw">${curTurn.word ? "draw: " + esc(curTurn.word.toUpperCase()) : ""}</div>` : ""}`;
+
+    if (curTurn.iDraw) {
+      const swatches = COLORS.map((col, i) => {
+        const id = "sw" + i;
+        setTimeout(() => {
+          const el = document.getElementById(id);
+          if (el) el.onclick = () => {
+            penColor = col; penWidth = 0.012;
+            document.querySelectorAll(".swatch").forEach((s) => s.classList.remove("sel"));
+            el.classList.add("sel");
+          };
+        }, 0);
+        return `<button class="swatch ${i === 0 ? "sel" : ""}" id="${id}" style="background:${col}"></button>`;
+      }).join("");
+      setTimeout(() => {
+        const er = document.getElementById("eraser");
+        if (er) er.onclick = () => { penColor = ERASER; penWidth = 0.05; document.querySelectorAll(".swatch").forEach((s) => s.classList.remove("sel")); };
+        const un = document.getElementById("undo");
+        if (un) un.onclick = () => { strokes.pop(); redraw(); toHost({ t: "draw", d: { a: "undo" } }); };
+        const cl = document.getElementById("clear");
+        if (cl) cl.onclick = () => { strokes = []; liveStroke = null; redraw(); toHost({ t: "draw", d: { a: "clear" } }); };
+      }, 0);
+      h(head + `
+        <canvas id="cv"></canvas>
+        <div class="tools">${swatches}
+          <button class="tool-btn" id="eraser">⌫ erase</button>
+          <button class="tool-btn" id="undo">↩ undo</button>
+          <button class="tool-btn" id="clear">🗑 clear</button>
+        </div>
+        <div class="box feed" id="feed"></div>
+        ${isHost ? hostBtn("⏭ force end turn", () => engine.endTurn(), "ghost") : ""}`);
+      setTimeout(() => { sizeCanvas(); bindDrawing(); }, 0);
+    } else {
+      setTimeout(() => {
+        const send = () => {
+          const inp = document.getElementById("gin");
+          if (!inp || !inp.value.trim()) return;
+          toHost({ t: "guess", text: inp.value, left: secondsLeft });
+          inp.value = "";
+        };
+        const b = document.getElementById("gbtn");
+        if (b) b.onclick = () => { ensureAudio(); send(); };
+        const inp = document.getElementById("gin");
+        if (inp) inp.onkeydown = (e) => { if (e.key === "Enter") { ensureAudio(); send(); } };
+      }, 0);
+      h(head + `
+        <canvas id="cv"></canvas>
+        <div id="guessbox"><div class="guessrow">
+          <input id="gin" maxlength="24" placeholder="type your guess…" autocomplete="off">
+          <button id="gbtn">GO</button>
+        </div></div>
+        <div class="box feed" id="feed"></div>
+        ${isHost ? hostBtn("⏭ force end turn", () => engine.endTurn(), "ghost") : ""}`);
+      setTimeout(sizeCanvas, 0);
+    }
+  }
+  window.addEventListener("resize", () => { if (cvEl()) sizeCanvas(); });
+
+  function renderTurnEnd(msg) {
+    const max = Math.max(...msg.board.map((b) => b.total), 1);
+    const medals = ["🥇", "🥈", "🥉"];
+    const rows = msg.board.map((b, i) => `
+      <div class="brow ${b.name === myName ? "me" : ""}">
+        <div class="bar" style="width:${(b.total / max) * 100}%"></div>
+        <div class="medal">${medals[i] || (i + 1)}</div>
+        <div class="bname">${esc(b.name)}${b.drew ? " 🖌️" : ""}</div>
+        <div class="bpts">${b.total}</div>
+        <div class="bdelta">${b.delta ? "+" + b.delta : ""}</div>
+      </div>`).join("");
+    const champ = msg.final ? `<div class="champ">👑 ${esc(msg.board[0].name)} IS THE MASTER ARTIST!</div>` : "";
+    const ctl = isHost
+      ? (msg.final ? hostBtn("PLAY AGAIN 🔁", () => engine.playAgain()) : hostBtn("NEXT TURN 🖌️", () => engine.next()))
+      : `<div class="waiting pulse">${msg.final ? "host can start a rematch…" : "waiting for the host…"}</div>`;
+    h(`
+      <div class="turn-head"><span>${msg.final ? "FINAL SCORES" : "TURN " + msg.turn + "/" + msg.total}</span><span>the word was</span></div>
+      <div class="reveal-word">${esc(String(msg.word).toUpperCase())}</div>
+      ${champ}
+      <div class="box board">${rows}</div>
+      ${ctl}
+    `);
+  }
+
+  showHome();
+})();
+</script>
+</body>
+</html>
