@@ -147,6 +147,19 @@
   .links { margin-top: 12px; font-size: 13px; text-align: center; }
   .links a { color: rgba(255,255,255,.65); text-decoration: underline; }
   .err { color: #ff8a8a; font-size: 13px; text-align: center; min-height: 18px; font-weight: 600; }
+
+  /* language switch + RTL (Arabic) */
+  .langbar { display: flex; gap: 8px; justify-content: center; margin-bottom: 2px; }
+  .langbar button {
+    flex: 1; padding: 9px; border-radius: 11px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.08);
+    color: #fff; font-weight: 800; font-size: 14px;
+  }
+  .langbar button.sel { background: linear-gradient(180deg, #d9a8ff, #b06dff); border-color: transparent; box-shadow: 0 4px 0 #471a80; }
+  body.ar { font-family: "Segoe UI", "Noto Naskh Arabic", "Geeza Pro", "Tahoma", system-ui, sans-serif; }
+  body.ar .reveal-word, body.ar .mask { letter-spacing: 2px; }
+  [dir="rtl"] .guessrow input { text-align: right; }
+  [dir="rtl"] .bdelta { text-align: left; }
 </style>
 </head>
 <body>
@@ -190,7 +203,8 @@
   /* =====================================================
      WORD BANK — drawable nouns
      ===================================================== */
-  const WORDS = ("cat,dog,fish,bird,snake,elephant,giraffe,lion,monkey,rabbit,turtle,spider,bee,butterfly,shark,whale,octopus,penguin,camel,horse," +
+  const WORD_BANKS = {
+    en: ("cat,dog,fish,bird,snake,elephant,giraffe,lion,monkey,rabbit,turtle,spider,bee,butterfly,shark,whale,octopus,penguin,camel,horse," +
     "pizza,burger,ice cream,banana,apple,grapes,carrot,cake,donut,cookie,egg,cheese,popcorn,watermelon,corn,mushroom,bread,candy,coffee,tea," +
     "house,castle,bridge,tent,lighthouse,windmill,pyramid,igloo,barn,skyscraper,church,mosque,school,hospital,prison,factory,stadium,fountain,tower,maze," +
     "car,bus,train,airplane,helicopter,rocket,boat,submarine,bicycle,motorcycle,truck,tractor,ambulance,skateboard,balloon,parachute,anchor,sailboat,scooter,ufo," +
@@ -199,7 +213,29 @@
     "king,queen,clown,pirate,ninja,wizard,ghost,angel,mermaid,cowboy,astronaut,doctor,chef,police,farmer,vampire,zombie,knight,baby,giant," +
     "glasses,hat,crown,shoe,sock,glove,scarf,umbrella,backpack,ring,necklace,watch,mask,belt,dress,boot,button,zipper,pocket,tie," +
     "scissors,hammer,saw,axe,broom,bucket,rope,net,cage,fence,mirror,pillow,blanket,toothbrush,soap,comb,spoon,fork,knife,plate," +
-    "football,basketball,tennis,golf,bowling,boxing,fishing,swimming,dancing,sleeping,running,jumping,crying,laughing,singing,reading,painting,cooking,driving,flying").split(",");
+    "football,basketball,tennis,golf,bowling,boxing,fishing,swimming,dancing,sleeping,running,jumping,crying,laughing,singing,reading,painting,cooking,driving,flying").split(","),
+    ar: ("قط,كلب,سمكة,طائر,ثعبان,فيل,زرافة,أسد,قرد,أرنب,سلحفاة,عنكبوت,نحلة,فراشة,حصان,جمل,بطريق,أخطبوط,حوت,قرش," +
+    "بيتزا,موزة,تفاحة,عنب,جزرة,كعكة,بيضة,جبن,خبز,قهوة,شاي,بطيخ,ذرة,فطر,حلوى,آيس كريم,برتقالة,فراولة,ليمون,بصل," +
+    "بيت,قلعة,جسر,خيمة,منارة,طاحونة,هرم,مدرسة,مستشفى,مسجد,برج,ملعب,نافورة,كنيسة,مصنع,سجن,حظيرة,ناطحة سحاب," +
+    "سيارة,حافلة,قطار,طائرة,مروحية,صاروخ,قارب,غواصة,دراجة,شاحنة,جرار,إسعاف,بالون,مظلة,مرساة,سفينة شراعية," +
+    "جيتار,بيانو,طبل,كمان,بوق,ميكروفون,جرس,صافرة,راديو,تلفاز,كاميرا,هاتف,حاسوب,روبوت,ساعة,مصباح,شمعة,مفتاح,قفل,سلم," +
+    "شمس,قمر,نجمة,سحابة,مطر,قوس قزح,برق,رجل ثلج,بركان,جزيرة,جبل,شاطئ,نهر,شجرة,زهرة,صبار,ورقة,نار,إعصار,موجة," +
+    "ملك,ملكة,مهرج,قرصان,نينجا,ساحر,شبح,ملاك,حورية,راعي بقر,رائد فضاء,طبيب,طباخ,شرطي,مزارع,مصاص دماء,فارس,طفل,عملاق," +
+    "نظارة,قبعة,تاج,حذاء,جورب,قفاز,وشاح,حقيبة,خاتم,قلادة,قناع,حزام,فستان,حذاء طويل,ربطة عنق," +
+    "مقص,مطرقة,منشار,فأس,مكنسة,دلو,حبل,شبكة,قفص,سياج,مرآة,وسادة,بطانية,فرشاة أسنان,صابون,مشط,ملعقة,شوكة,سكين,طبق," +
+    "كرة قدم,كرة سلة,تنس,غولف,بولينغ,ملاكمة,صيد,سباحة,رقص,نوم,جري,قفز,بكاء,ضحك,غناء,قراءة,رسم,طبخ,قيادة,طيران").split(","),
+  };
+
+  /* letter test (Latin + Arabic) and forgiving Arabic-aware normalizer */
+  const isLetter = (ch) => /[a-z؀-ۿ]/i.test(ch);
+  function normalize(s) {
+    return String(s).trim().toLowerCase()
+      .replace(/[ً-ْٰـ]/g, "")   // strip tashkeel + tatweel
+      .replace(/[أإآ]/g, "ا")
+      .replace(/ى/g, "ي")
+      .replace(/ة/g, "ه")
+      .replace(/\s+/g, " ");
+  }
 
   /* =====================================================
      GAME ENGINE (host-side, transport-agnostic, testable)
@@ -208,10 +244,12 @@
     const E = {
       players: [],        // {id, name, score, gone}
       phase: "lobby",     // lobby | choose | draw | turnEnd
+      lang: "en",         // word-bank + UI language for the whole room
       turn: 0,
       TOTAL: 0,
       drawer: null,
-      word: null,
+      word: null,         // display form
+      norm: null,         // normalized form for matching
       mask: null,         // [{ch, shown}]
       choices: null,
       guessed: null,      // {name: true}
@@ -240,7 +278,7 @@
     };
     function sendLobby() {
       if (E.phase !== "lobby") return;
-      bcast({ t: "lobby", players: E.players.map((p) => p.name), canStart: E.players.length >= 2 });
+      bcast({ t: "lobby", lang: E.lang, players: E.players.map((p) => p.name), canStart: E.players.length >= 2 });
     }
     E.sendLobby = sendLobby;
 
@@ -260,10 +298,11 @@
       E.drawer = a[(E.turn - 1) % a.length];
       E.word = null; E.mask = null;
       E.guessed = {}; E.deltas = {};
+      const bank = WORD_BANKS[E.lang] || WORD_BANKS.en;
       const set = new Set();
-      while (set.size < 3) set.add(WORDS[ri(WORDS.length)]);
+      while (set.size < 3) set.add(bank[ri(bank.length)]);
       E.choices = [...set];
-      bcast({ t: "turnSetup", drawer: E.drawer.name, turn: E.turn, total: E.TOTAL });
+      bcast({ t: "turnSetup", lang: E.lang, drawer: E.drawer.name, turn: E.turn, total: E.TOTAL });
       send(E.drawer.id, { t: "choices", words: E.choices });
     }
 
@@ -274,7 +313,7 @@
       if (typeof word !== "string") return;
       const w = word.trim().replace(/\s+/g, " ");
       if (!E.choices.includes(w)) {        // a custom word typed by the drawer
-        if (w.length < 2 || w.length > 24 || !/[a-z]/i.test(w)) return;
+        if (w.length < 2 || w.length > 24 || !/[a-z؀-ۿ]/i.test(w)) return;
       }
       beginDraw(w);
     };
@@ -283,10 +322,11 @@
       beginDraw(E.choices[0]);
     };
     function beginDraw(word) {
-      E.word = word.toLowerCase();
-      E.mask = E.word.split("").map((ch) => ({ ch, shown: !/[a-z]/.test(ch) }));
+      E.word = String(word).trim();
+      E.norm = normalize(E.word);
+      E.mask = [...E.word].map((ch) => ({ ch, shown: !isLetter(ch) }));
       E.phase = "draw";
-      bcast({ t: "turnStart", drawer: E.drawer.name, mask: maskStr(), seconds: 75, turn: E.turn, total: E.TOTAL });
+      bcast({ t: "turnStart", lang: E.lang, drawer: E.drawer.name, mask: maskStr(), seconds: 75, turn: E.turn, total: E.TOTAL });
       send(E.drawer.id, { t: "yourWord", word: E.word });
     }
 
@@ -313,9 +353,10 @@
       if (E.phase !== "draw") return;
       const p = E.players.find((x) => x.id === id);
       if (!p || p.gone || p === E.drawer || E.guessed[p.name]) return;
-      const clean = String(text || "").trim().toLowerCase();
+      const clean = String(text || "").trim();
       if (!clean) return;
-      if (clean === E.word) {
+      const nc = normalize(clean);
+      if (nc === E.norm) {
         E.guessed[p.name] = true;
         const pts = 100 + Math.round(Math.max(0, Number(secondsLeft) || 0) * 4);
         p.score += pts;
@@ -325,7 +366,7 @@
         bcast({ t: "feed", name: p.name, correct: true });
         send(p.id, { t: "youGot", pts });
         maybeAllGuessed();
-      } else if (lev1(clean, E.word)) {
+      } else if (lev1(nc, E.norm)) {
         send(p.id, { t: "feed", close: true, text: clean });
       } else {
         bcast({ t: "feed", name: p.name, text: clean.slice(0, 24) });
@@ -351,7 +392,7 @@
       const board = [...alive()].sort((a, b) => b.score - a.score).map((p) => ({
         name: p.name, total: p.score, delta: E.deltas[p.name] || 0, drew: p === E.drawer,
       }));
-      bcast({ t: "turnEnd", word: E.word || E.choices[0], board, turn: E.turn, total: E.TOTAL, final: E.turn >= E.TOTAL });
+      bcast({ t: "turnEnd", lang: E.lang, word: E.word || E.choices[0], board, turn: E.turn, total: E.TOTAL, final: E.turn >= E.TOTAL });
     };
 
     E.next = () => {
@@ -389,6 +430,82 @@
   function clearTimers() { timers.forEach(clearTimeout); timers = []; clearInterval(countdown); countdown = null; }
   function after(ms, fn) { timers.push(setTimeout(fn, ms)); }
 
+  /* ---- language (English / العربية) ---- */
+  const STR = {
+    en: {
+      logo: "🎨 SKETCH & GUESS", subL1: "one of you draws, everyone races to guess",
+      subL2: "2–8 phones, one room code (3+ is best)", allGames: "🏠 All games",
+      yourName: "YOUR NAME", namePh: "e.g. Kira", hostBtn: "HOST A GAME",
+      orJoin: "OR JOIN A ROOM", codePh: "CODE", joinBtn: "JOIN",
+      needName: "Enter a name first!", needLib: "Couldn't load the network library — check your internet.",
+      code4: "Room codes are 4 letters.", settingUp: "Setting up your room…",
+      joining: "Joining room {0}…", createErr: "Couldn't create room ({0}). Try again.",
+      lost: "Connection lost. Rejoin with the room code.",
+      notFound: "Room not found — check the code (host must keep their screen on).",
+      connErr: "Connection error ({0}).",
+      roomCode: "ROOM CODE — tell your friends",
+      codeHint: "they open this page → JOIN → type the code<br>keep this screen ON while they join",
+      artists: "ARTISTS ({0}/8)", startDraw: "START DRAWING 🎨", need2: "need at least 2 players…",
+      waitStart: "waiting for the host to start…", turn: "TURN {0}/{1}", draws: "🖌️ {0} draws",
+      pickWord: "PICK YOUR WORD — you'll draw it", orOwn: "— or make your own —",
+      ownPh: "type your own word…", drawMine: "DRAW MINE ✏️", gettingWords: "getting your words…",
+      choosing: "🖌️ {0} is choosing a word…", forcePick: "⏭ force pick (stuck?)",
+      drawLbl: "draw: {0}", erase: "⌫ erase", undo: "↩ undo", clear: "🗑 clear",
+      guessPh: "type your guess…", go: "GO", forceEnd: "⏭ force end turn",
+      guessed: "✅ {0} guessed it!", close: "🔥 \"{0}\" is SO close!",
+      youGot: "🎉 +{0} points! Watch the others sweat…",
+      finalScores: "FINAL SCORES", wordWas: "the word was", champ: "👑 {0} IS THE MASTER ARTIST!",
+      playAgain: "PLAY AGAIN 🔁", nextTurn: "NEXT TURN 🖌️",
+      rematch: "host can start a rematch…", waitHost: "waiting for the host…",
+    },
+    ar: {
+      logo: "🎨 ارسم وخمّن", subL1: "أحدكم يرسم والجميع يتسابق للتخمين",
+      subL2: "٢–٨ هواتف، ورمز غرفة واحد (٣+ أفضل)", allGames: "🏠 كل الألعاب",
+      yourName: "اسمك", namePh: "مثال: كيرا", hostBtn: "أنشئ غرفة",
+      orJoin: "أو انضم لغرفة", codePh: "الرمز", joinBtn: "انضمام",
+      needName: "اكتب اسمك أولاً!", needLib: "تعذّر تحميل مكتبة الشبكة — تحقق من الإنترنت.",
+      code4: "الرمز مكوّن من ٤ أحرف.", settingUp: "جارٍ تجهيز غرفتك…",
+      joining: "جارٍ الانضمام إلى الغرفة {0}…", createErr: "تعذّر إنشاء الغرفة ({0}). حاول مجددًا.",
+      lost: "انقطع الاتصال. أعد الانضمام بالرمز.",
+      notFound: "الغرفة غير موجودة — تحقق من الرمز (على المضيف إبقاء شاشته مفتوحة).",
+      connErr: "خطأ في الاتصال ({0}).",
+      roomCode: "رمز الغرفة — أخبر أصدقاءك",
+      codeHint: "يفتحون هذه الصفحة ← انضمام ← يكتبون الرمز<br>أبقِ هذه الشاشة مفتوحة أثناء انضمامهم",
+      artists: "الرسّامون ({0}/8)", startDraw: "ابدأ الرسم 🎨", need2: "نحتاج لاعبَين على الأقل…",
+      waitStart: "بانتظار أن يبدأ المضيف…", turn: "الجولة {0}/{1}", draws: "🖌️ {0} يرسم",
+      pickWord: "اختر كلمتك — ستقوم برسمها", orOwn: "— أو اكتب كلمتك —",
+      ownPh: "اكتب كلمتك الخاصة…", drawMine: "ارسم كلمتي ✏️", gettingWords: "جارٍ جلب كلماتك…",
+      choosing: "🖌️ {0} يختار كلمة…", forcePick: "⏭ اختيار إجباري (عالق؟)",
+      drawLbl: "ارسم: {0}", erase: "⌫ ممحاة", undo: "↩ تراجع", clear: "🗑 مسح",
+      guessPh: "اكتب تخمينك…", go: "خمّن", forceEnd: "⏭ إنهاء الدور",
+      guessed: "✅ {0} خمّنها!", close: "🔥 \"{0}\" قريبة جدًا!",
+      youGot: "🎉 +{0} نقطة! دع البقية يتعرّقون…",
+      finalScores: "النتائج النهائية", wordWas: "الكلمة كانت", champ: "👑 {0} هو الفنان البطل!",
+      playAgain: "العب مجددًا 🔁", nextTurn: "الدور التالي 🖌️",
+      rematch: "يمكن للمضيف بدء جولة جديدة…", waitHost: "بانتظار المضيف…",
+    },
+  };
+  let LANG = "en";
+  try { const s = localStorage.getItem("sketchLang"); if (s === "ar" || s === "en") LANG = s; } catch (e) {}
+  const t = (k) => (STR[LANG] && STR[LANG][k] != null) ? STR[LANG][k] : (STR.en[k] != null ? STR.en[k] : k);
+  const tf = (k, ...vals) => { let s = t(k); vals.forEach((v, i) => { s = s.replace("{" + i + "}", v); }); return s; };
+  function applyLangChrome() {
+    document.documentElement.lang = LANG;
+    document.documentElement.dir = (LANG === "ar") ? "rtl" : "ltr";
+    document.body.classList.toggle("ar", LANG === "ar");
+    const lg = document.querySelector(".logo"); if (lg) lg.textContent = t("logo");
+    const sb = document.querySelector(".sub"); if (sb) sb.innerHTML = t("subL1") + "<br>" + t("subL2");
+    const lk = document.querySelector(".links"); if (lk) lk.innerHTML = '<a href="index.html">' + t("allGames") + "</a>";
+  }
+  function setLang(l) {
+    if (l !== "ar") l = "en";
+    if (l === LANG) { applyLangChrome(); return; }
+    LANG = l;
+    try { localStorage.setItem("sketchLang", l); } catch (e) {}
+    applyLangChrome();
+    if (engine) engine.lang = l;
+  }
+
   const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ";
   function makeCode() {
     let c = "";
@@ -400,7 +517,7 @@
   function hostGame(name) {
     myName = name;
     isHost = true;
-    showWait("Setting up your room…");
+    showWait(t("settingUp"));
     const code = makeCode();
     peer = new Peer(peerId(code));
     peer.on("open", () => {
@@ -409,6 +526,7 @@
         else if (hostConns[pid]) try { hostConns[pid].send(msg); } catch (e) {}
       });
       engine.code = code;
+      engine.lang = LANG;
       myName = engine.addPlayer("host", name);
       peer.on("connection", (conn) => {
         conn.on("data", (msg) => {
@@ -422,25 +540,25 @@
       });
       engine.sendLobby();
     });
-    peer.on("error", (e) => showHome("Couldn't create room (" + e.type + "). Try again."));
+    peer.on("error", (e) => showHome(tf("createErr", e.type)));
   }
 
   function joinGame(code, name) {
     myName = name;
     isHost = false;
-    showWait("Joining room " + code.toUpperCase() + "…");
+    showWait(tf("joining", code.toUpperCase()));
     peer = new Peer();
     peer.on("open", () => {
       clientConn = peer.connect(peerId(code), { reliable: true });
       let opened = false;
       clientConn.on("open", () => { opened = true; clientConn.send({ t: "join", name }); });
       clientConn.on("data", (msg) => handleMsg(msg));
-      clientConn.on("close", () => showHome("Connection lost. Rejoin with the room code."));
-      setTimeout(() => { if (!opened) showHome("Room not found — check the code (host must keep their screen on)."); }, 9000);
+      clientConn.on("close", () => showHome(t("lost")));
+      setTimeout(() => { if (!opened) showHome(t("notFound")); }, 9000);
     });
     peer.on("error", (e) => {
-      if (e.type === "peer-unavailable") showHome("Room not found — check the code (host must keep their screen on).");
-      else showHome("Connection error (" + e.type + ").");
+      if (e.type === "peer-unavailable") showHome(t("notFound"));
+      else showHome(tf("connErr", e.type));
     });
   }
 
@@ -468,6 +586,7 @@
 
   /* ---- message handling ---- */
   function handleMsg(msg) {
+    if (msg.lang && msg.lang !== LANG) setLang(msg.lang);
     if (msg.t === "lobby") { clearTimers(); stopHostClock(); renderLobby(msg); }
     else if (msg.t === "turnSetup") {
       clearTimers(); stopHostClock();
@@ -495,12 +614,12 @@
       }, 1000);
       if (isHost) hostRunTurnClock();
     }
-    else if (msg.t === "yourWord") { if (curTurn) { curTurn.word = msg.word; const el = document.getElementById("yw"); if (el) el.textContent = "draw: " + msg.word.toUpperCase(); } }
+    else if (msg.t === "yourWord") { if (curTurn) { curTurn.word = msg.word; const el = document.getElementById("yw"); if (el) el.textContent = tf("drawLbl", msg.word.toUpperCase()); } }
     else if (msg.t === "draw") applyRemote(msg.d);
     else if (msg.t === "hint") { sHint(); if (curTurn) { curTurn.mask = msg.mask; const el = document.getElementById("mask"); if (el) el.textContent = spacedMask(); } }
     else if (msg.t === "feed") {
-      if (msg.correct) { sDing(); feed.push(`<span class="ok">✅ ${esc(msg.name)} guessed it!</span>`); }
-      else if (msg.close) { sClose(); feed.push(`<span class="close">🔥 "${esc(msg.text)}" is SO close!</span>`); }
+      if (msg.correct) { sDing(); feed.push(`<span class="ok">${esc(tf("guessed", msg.name))}</span>`); }
+      else if (msg.close) { sClose(); feed.push(`<span class="close">${esc(tf("close", msg.text))}</span>`); }
       else { sWrong(); feed.push(`<b>${esc(msg.name)}:</b> ${esc(msg.text)}`); }
       const f = document.getElementById("feed");
       if (f) { f.innerHTML = feed.slice(-7).join("<br>"); f.scrollTop = f.scrollHeight; }
@@ -508,7 +627,7 @@
     else if (msg.t === "youGot") {
       buzz([30, 20, 60]);
       const g = document.getElementById("guessbox");
-      if (g) g.innerHTML = `<div class="youword">🎉 +${msg.pts} points! Watch the others sweat…</div>`;
+      if (g) g.innerHTML = `<div class="youword">${esc(tf("youGot", msg.pts))}</div>`;
     }
     else if (msg.t === "turnEnd") {
       clearTimers(); stopHostClock();
@@ -531,27 +650,36 @@
 
   function showHome(err) {
     clearTimers(); stopHostClock();
+    setTimeout(() => {
+      const be = document.getElementById("langEn"), ba = document.getElementById("langAr");
+      if (be) be.onclick = () => { sClick(); setLang("en"); showHome(); };
+      if (ba) ba.onclick = () => { sClick(); setLang("ar"); showHome(); };
+    }, 0);
     h(`
+      <div class="langbar">
+        <button id="langEn" class="${LANG === "en" ? "sel" : ""}">English</button>
+        <button id="langAr" class="${LANG === "ar" ? "sel" : ""}">العربية</button>
+      </div>
       <div class="box">
-        <h2>YOUR NAME</h2>
-        <input id="nameIn" maxlength="14" placeholder="e.g. Kira" autocomplete="off">
+        <h2>${t("yourName")}</h2>
+        <input id="nameIn" maxlength="14" placeholder="${t("namePh")}" autocomplete="off">
         <div class="err">${err ? esc(err) : ""}</div>
-        ${hostBtn("HOST A GAME", () => {
+        ${hostBtn(t("hostBtn"), () => {
           const n = document.getElementById("nameIn").value.trim();
-          if (!n) return showHome("Enter a name first!");
-          if (typeof Peer === "undefined") return showHome("Couldn't load the network library — check your internet.");
+          if (!n) return showHome(t("needName"));
+          if (typeof Peer === "undefined") return showHome(t("needLib"));
           hostGame(n);
         })}
       </div>
       <div class="box">
-        <h2>OR JOIN A ROOM</h2>
-        <input id="codeIn" maxlength="4" placeholder="CODE" style="letter-spacing:8px;text-transform:uppercase" autocomplete="off">
-        ${hostBtn("JOIN", () => {
+        <h2>${t("orJoin")}</h2>
+        <input id="codeIn" maxlength="4" placeholder="${t("codePh")}" style="letter-spacing:8px;text-transform:uppercase" autocomplete="off">
+        ${hostBtn(t("joinBtn"), () => {
           const n = document.getElementById("nameIn").value.trim();
           const c = document.getElementById("codeIn").value.trim();
-          if (!n) return showHome("Enter a name first!");
-          if (c.length !== 4) return showHome("Room codes are 4 letters.");
-          if (typeof Peer === "undefined") return showHome("Couldn't load the network library — check your internet.");
+          if (!n) return showHome(t("needName"));
+          if (c.length !== 4) return showHome(t("code4"));
+          if (typeof Peer === "undefined") return showHome(t("needLib"));
           joinGame(c, n);
         }, "alt")}
       </div>
@@ -562,22 +690,22 @@
   function renderLobby(msg) {
     h(`
       ${isHost ? `<div class="box" style="text-align:center">
-        <h2>ROOM CODE — tell your friends</h2>
+        <h2>${t("roomCode")}</h2>
         <div class="code-big">${engine.code}</div>
-        <div class="code-hint">they open this page → JOIN → type the code<br>keep this screen ON while they join</div>
+        <div class="code-hint">${t("codeHint")}</div>
       </div>` : ""}
       <div class="box">
-        <h2>ARTISTS (${msg.players.length}/8)</h2>
+        <h2>${tf("artists", msg.players.length)}</h2>
         <div class="chips">${msg.players.map((p) => `<span class="chip ${p === myName ? "me" : ""}">${esc(p)}</span>`).join("")}</div>
       </div>
       ${isHost
-        ? (msg.canStart ? hostBtn("START DRAWING 🎨", () => engine.start()) : `<div class="waiting pulse">need at least 2 players…</div>`)
-        : `<div class="waiting pulse">waiting for the host to start…</div>`}
+        ? (msg.canStart ? hostBtn(t("startDraw"), () => engine.start()) : `<div class="waiting pulse">${t("need2")}</div>`)
+        : `<div class="waiting pulse">${t("waitStart")}</div>`}
     `);
   }
 
   function renderChoose() {
-    const head = `<div class="turn-head"><span>TURN ${curTurn.turn}/${curTurn.total}</span><span>🖌️ ${esc(curTurn.drawer)} draws</span></div>`;
+    const head = `<div class="turn-head"><span>${tf("turn", curTurn.turn, curTurn.total)}</span><span>${esc(tf("draws", curTurn.drawer))}</span></div>`;
     if (curTurn.iDraw && curTurn.choices) {
       const btns = curTurn.choices.map((w) => {
         const id = "wc" + Math.random().toString(36).slice(2, 8);
@@ -598,15 +726,15 @@
         if (b) b.onclick = go;
         if (inp) inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } };
       }, 0);
-      h(head + `<div class="box"><h2>PICK YOUR WORD — you'll draw it</h2><div class="choice-grid">${btns}</div>` +
-        `<div class="orsep">— or make your own —</div>` +
-        `<input id="${cin}" maxlength="24" placeholder="type your own word…" autocomplete="off">` +
-        `<button class="btn" id="${cbtn}">DRAW MINE ✏️</button></div>`);
+      h(head + `<div class="box"><h2>${t("pickWord")}</h2><div class="choice-grid">${btns}</div>` +
+        `<div class="orsep">${t("orOwn")}</div>` +
+        `<input id="${cin}" maxlength="24" placeholder="${t("ownPh")}" autocomplete="off">` +
+        `<button class="btn" id="${cbtn}">${t("drawMine")}</button></div>`);
     } else if (curTurn.iDraw) {
-      h(head + `<div class="box waiting pulse">getting your words…</div>`);
+      h(head + `<div class="box waiting pulse">${t("gettingWords")}</div>`);
     } else {
-      h(head + `<div class="box waiting pulse">🖌️ ${esc(curTurn.drawer)} is choosing a word…</div>` +
-        (isHost ? hostBtn("⏭ force pick (stuck?)", () => engine.forcePick(), "ghost") : ""));
+      h(head + `<div class="box waiting pulse">${esc(tf("choosing", curTurn.drawer))}</div>` +
+        (isHost ? hostBtn(t("forcePick"), () => engine.forcePick(), "ghost") : ""));
     }
   }
 
@@ -704,10 +832,10 @@
 
   function renderDraw() {
     const head = `
-      <div class="turn-head"><span>TURN ${curTurn.turn}/${curTurn.total}</span><span id="tleft">75s</span></div>
+      <div class="turn-head"><span>${tf("turn", curTurn.turn, curTurn.total)}</span><span id="tleft">75s</span></div>
       <div class="timebar-wrap"><div class="timebar" id="tbar" style="width:100%"></div></div>
       <div class="mask" id="mask">${curTurn.iDraw ? "" : spacedMask()}</div>
-      ${curTurn.iDraw ? `<div class="youword" id="yw">${curTurn.word ? "draw: " + esc(curTurn.word.toUpperCase()) : ""}</div>` : ""}`;
+      ${curTurn.iDraw ? `<div class="youword" id="yw">${curTurn.word ? esc(tf("drawLbl", curTurn.word.toUpperCase())) : ""}</div>` : ""}`;
 
     if (curTurn.iDraw) {
       const swatches = COLORS.map((col, i) => {
@@ -733,12 +861,12 @@
       h(head + `
         <canvas id="cv"></canvas>
         <div class="tools">${swatches}
-          <button class="tool-btn" id="eraser">⌫ erase</button>
-          <button class="tool-btn" id="undo">↩ undo</button>
-          <button class="tool-btn" id="clear">🗑 clear</button>
+          <button class="tool-btn" id="eraser">${t("erase")}</button>
+          <button class="tool-btn" id="undo">${t("undo")}</button>
+          <button class="tool-btn" id="clear">${t("clear")}</button>
         </div>
         <div class="box feed" id="feed"></div>
-        ${isHost ? hostBtn("⏭ force end turn", () => engine.endTurn(), "ghost") : ""}`);
+        ${isHost ? hostBtn(t("forceEnd"), () => engine.endTurn(), "ghost") : ""}`);
       setTimeout(() => { sizeCanvas(); bindDrawing(); }, 0);
     } else {
       setTimeout(() => {
@@ -756,11 +884,11 @@
       h(head + `
         <canvas id="cv"></canvas>
         <div id="guessbox"><div class="guessrow">
-          <input id="gin" maxlength="24" placeholder="type your guess…" autocomplete="off">
-          <button id="gbtn">GO</button>
+          <input id="gin" maxlength="24" placeholder="${t("guessPh")}" autocomplete="off">
+          <button id="gbtn">${t("go")}</button>
         </div></div>
         <div class="box feed" id="feed"></div>
-        ${isHost ? hostBtn("⏭ force end turn", () => engine.endTurn(), "ghost") : ""}`);
+        ${isHost ? hostBtn(t("forceEnd"), () => engine.endTurn(), "ghost") : ""}`);
       setTimeout(sizeCanvas, 0);
     }
   }
@@ -777,12 +905,12 @@
         <div class="bpts">${b.total}</div>
         <div class="bdelta">${b.delta ? "+" + b.delta : ""}</div>
       </div>`).join("");
-    const champ = msg.final ? `<div class="champ">👑 ${esc(msg.board[0].name)} IS THE MASTER ARTIST!</div>` : "";
+    const champ = msg.final ? `<div class="champ">${esc(tf("champ", msg.board[0].name))}</div>` : "";
     const ctl = isHost
-      ? (msg.final ? hostBtn("PLAY AGAIN 🔁", () => engine.playAgain()) : hostBtn("NEXT TURN 🖌️", () => engine.next()))
-      : `<div class="waiting pulse">${msg.final ? "host can start a rematch…" : "waiting for the host…"}</div>`;
+      ? (msg.final ? hostBtn(t("playAgain"), () => engine.playAgain()) : hostBtn(t("nextTurn"), () => engine.next()))
+      : `<div class="waiting pulse">${msg.final ? t("rematch") : t("waitHost")}</div>`;
     h(`
-      <div class="turn-head"><span>${msg.final ? "FINAL SCORES" : "TURN " + msg.turn + "/" + msg.total}</span><span>the word was</span></div>
+      <div class="turn-head"><span>${msg.final ? t("finalScores") : tf("turn", msg.turn, msg.total)}</span><span>${t("wordWas")}</span></div>
       <div class="reveal-word">${esc(String(msg.word).toUpperCase())}</div>
       ${champ}
       <div class="box board">${rows}</div>
@@ -790,6 +918,7 @@
     `);
   }
 
+  applyLangChrome();
   showHome();
 })();
 </script>
