@@ -140,6 +140,7 @@
   .champ { text-align: center; font-size: 20px; font-weight: 900; padding: 14px; border-radius: 14px;
     background: rgba(255,140,205,.12); border: 1px solid #ff8ccd; line-height: 1.5; }
   .choice-grid { display: flex; flex-direction: column; gap: 10px; }
+  .orsep { text-align: center; font-size: 12px; letter-spacing: 2px; opacity: .45; font-weight: 700; margin: 14px 0 10px; }
   .waiting { text-align: center; font-size: 14px; opacity: .7; padding: 8px; }
   .pulse { animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .45; } }
@@ -270,8 +271,12 @@
 
     E.pickWord = (id, word) => {
       if (E.phase !== "choose" || !E.drawer || E.drawer.id !== id) return;
-      if (!E.choices.includes(word)) return;
-      beginDraw(word);
+      if (typeof word !== "string") return;
+      const w = word.trim().replace(/\s+/g, " ");
+      if (!E.choices.includes(w)) {        // a custom word typed by the drawer
+        if (w.length < 2 || w.length > 24 || !/[a-z]/i.test(w)) return;
+      }
+      beginDraw(w);
     };
     E.forcePick = () => {     // host safety: drawer idle
       if (E.phase !== "choose") return;
@@ -582,7 +587,21 @@
         }, 0);
         return `<button class="btn ghost" id="${id}" style="font-size:17px;padding:15px">${esc(w.toUpperCase())}</button>`;
       }).join("");
-      h(head + `<div class="box"><h2>PICK YOUR WORD — you'll draw it</h2><div class="choice-grid">${btns}</div></div>`);
+      const cin = "wcustom", cbtn = "wcustombtn";
+      setTimeout(() => {
+        const inp = document.getElementById(cin), b = document.getElementById(cbtn);
+        const go = () => {
+          const v = (inp && inp.value || "").trim();
+          if (v.length < 2) { if (inp) inp.focus(); return; }
+          ensureAudio(); sClick(); toHost({ t: "pick", word: v });
+        };
+        if (b) b.onclick = go;
+        if (inp) inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } };
+      }, 0);
+      h(head + `<div class="box"><h2>PICK YOUR WORD — you'll draw it</h2><div class="choice-grid">${btns}</div>` +
+        `<div class="orsep">— or make your own —</div>` +
+        `<input id="${cin}" maxlength="24" placeholder="type your own word…" autocomplete="off">` +
+        `<button class="btn" id="${cbtn}">DRAW MINE ✏️</button></div>`);
     } else if (curTurn.iDraw) {
       h(head + `<div class="box waiting pulse">getting your words…</div>`);
     } else {
