@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#0c1730">
-<title>تحدّي المعلومات 🧠</title>
+<title>الفخّ 🎭 — اكتب واخدع وخمّن</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -127,6 +127,24 @@
   .result-banner.ok { background: rgba(61,220,132,.14); border: 1px solid #3ddc84; color: #b8ffd4; }
   .result-banner.no { background: rgba(232,80,91,.14); border: 1px solid #e8505b; color: #ffc4c8; }
 
+  /* bluffing game: write hint + option list */
+  .bluff-hint { font-size: 13px; line-height: 1.6; opacity: .8; margin: 12px 2px; text-align: center; }
+  .bluff-hint b { color: #ffd54a; }
+  .opt-list { display: flex; flex-direction: column; gap: 10px; }
+  .opt {
+    width: 100%; text-align: right; padding: 14px 16px; border-radius: 13px;
+    border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.07);
+    color: #fff; font-weight: 800; font-size: 16px; line-height: 1.4;
+    box-shadow: 0 4px 0 rgba(0,0,0,.3);
+  }
+  .opt:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+  .opt:disabled { box-shadow: none; }
+  .opt.own { opacity: .55; border-style: dashed; background: rgba(255,255,255,.04); }
+  .opt.picked { outline: 3px solid #5cc8ff; box-shadow: 0 0 18px rgba(92,200,255,.4); }
+  .opt.truth { border-color: #3ddc84; background: rgba(61,220,132,.16); box-shadow: 0 0 18px rgba(61,220,132,.35); }
+  .opt.fake { background: rgba(232,80,91,.10); border-color: rgba(232,80,91,.4); }
+  .opt .meta { display: block; font-size: 11.5px; font-weight: 700; opacity: .85; margin-top: 5px; }
+
   .board { display: flex; flex-direction: column; gap: 8px; }
   .brow {
     display: flex; align-items: center; gap: 10px;
@@ -152,8 +170,8 @@
 </style>
 </head>
 <body>
-<div class="logo">🧠 تحدّي المعلومات</div>
-<div class="sub">أسرع إجابة صحيحة تكسب أكثر نقاط<br>٢–٨ هواتف، ورمز غرفة واحد (٣+ أفضل)</div>
+<div class="logo">🎭 الفخّ</div>
+<div class="sub">اكتب إجابة مزيّفة تخدع أصدقاءك، ثم خمّن الحقيقية<br>٣+ لاعبين أفضل، رمز غرفة واحد</div>
 <div id="app"></div>
 <div class="links"><a href="index.html">🏠 كل الألعاب</a></div>
 
@@ -827,33 +845,51 @@
   /* =====================================================
      GAME ENGINE (host-side, transport-agnostic)
      ===================================================== */
-  const SEC = 20;
-  const PER_GAME = 10;
+  const WRITE_SEC = 40;   // time to write a bluff
+  const CHOOSE_SEC = 25;  // time to pick the real answer
+  const ROUNDS = 8;       // questions per game
+  const PT_TRUTH = 1000;  // you found the real answer
+  const PT_FOOL = 500;    // per player your bluff fooled
+  const PT_KNEW = 1000;   // your bluff WAS the real answer (you knew it)
+
+  // forgiving Arabic-aware normalizer for matching bluffs to the truth / each other
+  function normAns(s) {
+    return String(s).trim().toLowerCase()
+      .replace(/[ً-ْٰـ]/g, "")           // tashkeel + tatweel
+      .replace(/[أإآ]/g, "ا")
+      .replace(/ى/g, "ي")
+      .replace(/ة/g, "ه")
+      .replace(/[.،,؛؟?!"'()]/g, "")
+      .replace(/^(ال|الـ)/, "")          // drop leading definite article
+      .replace(/\s+/g, " ");
+  }
 
   function createTriviaEngine(send) {
     const E = {
-      players: [],        // {id, name, score, gone, choice, ansMs}
-      phase: "lobby",     // lobby | question | reveal | gameEnd
-      cats: [],           // chosen category ids (one or more)
-      diff: null,         // chosen difficulty {id, name}
+      players: [],        // {id,name,score,gone, bluff, bluffNorm, vote, knew}
+      phase: "lobby",     // lobby | write | choose | reveal | gameEnd
+      cats: [],
+      diff: null,
       qIndex: 0,
       TOTAL: 0,
-      deck: [],           // [{q, a[], c}] already shuffled (questions + options)
-      cur: null,          // current served question {q, a[], c}
-      qStart: 0,
-      deltas: null,       // {name: pts this question}
+      deck: [],           // [{q, answer, catName}]
+      cur: null,
+      options: [],        // [{id, text, truth, authors:[ids], pickers:[ids]}]
+      deltas: null,       // {name: pts this round}
     };
     const alive = () => E.players.filter((p) => !p.gone);
     const bcast = (msg) => { for (const p of alive()) send(p.id, msg); };
     const ri = (n) => Math.floor(Math.random() * n);
     const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = ri(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+    const nameOf = (id) => { const p = E.players.find((x) => x.id === id); return p ? p.name : "?"; };
+    const addDelta = (p, n) => { E.deltas[p.name] = (E.deltas[p.name] || 0) + n; };
 
     E.addPlayer = (id, name) => {
       if (E.phase !== "lobby" || E.players.length >= 8) return false;
       let n = (name || "لاعب").trim().slice(0, 14) || "لاعب";
       let base = n, k = 2;
       while (E.players.some((p) => p.name === n)) n = base + " " + k++;
-      E.players.push({ id, name: n, score: 0, gone: false, choice: null, ansMs: 0 });
+      E.players.push({ id, name: n, score: 0, gone: false, bluff: null, bluffNorm: null, vote: null, knew: false });
       sendLobby();
       return n;
     };
@@ -862,7 +898,8 @@
       if (!p) return;
       if (E.phase === "lobby") { E.players = E.players.filter((x) => x.id !== id); sendLobby(); return; }
       p.gone = true;
-      if (E.phase === "question") maybeAllAnswered();
+      if (E.phase === "write") maybeAllWrote();
+      else if (E.phase === "choose") maybeAllVoted();
     };
     function sendLobby() {
       if (E.phase !== "lobby") return;
@@ -877,81 +914,140 @@
       if (!ids.length) ids = [CATS[0].id];
       E.cats = ids; E.diff = diff;
       for (const p of E.players) p.score = 0;
-      // build a shuffled deck pooled from every chosen category at the chosen difficulty
+      // pool questions from every chosen category; the real answer is option a[c]
       let pool = [];
       for (const id of ids) {
         const cname = (CATS.find((c) => c.id === id) || {}).name || "";
-        for (const item of (BANK[id][diff.id] || [])) pool.push({ q: item.q, a: item.a, c: item.c, catName: cname });
+        for (const item of (BANK[id][diff.id] || [])) pool.push({ q: item.q, answer: item.a[item.c], catName: cname });
       }
-      const picked = shuffle(pool).slice(0, Math.min(PER_GAME, pool.length));
-      E.deck = picked.map((item) => {
-        const opts = item.a.map((text, i) => ({ text, correct: i === item.c }));
-        shuffle(opts);
-        return { q: item.q, a: opts.map((o) => o.text), c: opts.findIndex((o) => o.correct), catName: item.catName };
-      });
+      E.deck = shuffle(pool).slice(0, Math.min(ROUNDS, pool.length));
       E.TOTAL = E.deck.length;
       E.qIndex = 0;
-      nextQuestion();
+      nextRound();
       return true;
     };
 
-    function nextQuestion() {
-      E.phase = "question";
-      E.cur = E.deck[E.qIndex];
+    function resetRound() {
+      for (const p of E.players) { p.bluff = null; p.bluffNorm = null; p.vote = null; p.knew = false; }
+      E.options = [];
       E.deltas = {};
-      for (const p of E.players) { p.choice = null; p.ansMs = 0; }
-      E.qStart = Date.now();
-      bcast({ t: "question", index: E.qIndex + 1, total: E.TOTAL, q: E.cur.q, options: E.cur.a, seconds: SEC, cat: E.cur.catName, diff: E.diff.name });
     }
 
-    E.answer = (id, choice) => {
-      if (E.phase !== "question") return;
+    function nextRound() {
+      E.phase = "write";
+      E.cur = E.deck[E.qIndex];
+      resetRound();
+      bcast({ t: "write", index: E.qIndex + 1, total: E.TOTAL, q: E.cur.q, cat: E.cur.catName, diff: E.diff.name, seconds: WRITE_SEC });
+    }
+
+    // ---- phase 1: write a bluff ----
+    E.submitBluff = (id, text) => {
+      if (E.phase !== "write") return;
       const p = E.players.find((x) => x.id === id);
-      if (!p || p.gone || p.choice !== null) return;
-      if (typeof choice !== "number" || choice < 0 || choice > 3) return;
-      p.choice = choice;
-      p.ansMs = Date.now() - E.qStart;
-      send(p.id, { t: "locked", choice });
-      maybeAllAnswered();
+      if (!p || p.gone || p.bluff !== null) return;
+      const t = String(text || "").trim().slice(0, 40);
+      if (!t) return;
+      p.bluff = t;
+      p.bluffNorm = normAns(t);
+      send(p.id, { t: "wrote" });
+      maybeAllWrote();
     };
-    function maybeAllAnswered() {
-      if (E.phase !== "question") return;
-      if (alive().length && alive().every((p) => p.choice !== null)) E.endQuestion();
+    function maybeAllWrote() {
+      if (E.phase !== "write") return;
+      if (alive().length && alive().every((p) => p.bluff !== null)) toChoose();
+    }
+    E.forceWrite = () => { if (E.phase === "write") toChoose(); };
+
+    // ---- build the option list (truth + unique fakes) and move to choose ----
+    function toChoose() {
+      if (E.phase !== "write") return;
+      E.phase = "choose";
+      const realNorm = normAns(E.cur.answer);
+      const map = new Map();
+      map.set(realNorm, { text: E.cur.answer, truth: true, authors: [] });
+      for (const p of alive()) {
+        if (p.bluff === null) continue;
+        if (p.bluffNorm === realNorm) { p.knew = true; continue; }   // they typed the truth
+        const e = map.get(p.bluffNorm);
+        if (e && !e.truth) e.authors.push(p.id);
+        else if (!e) map.set(p.bluffNorm, { text: p.bluff, truth: false, authors: [p.id] });
+        else p.knew = true;   // collided with truth norm
+      }
+      E.options = shuffle([...map.values()]);
+      E.options.forEach((o, i) => { o.id = i; o.pickers = []; });
+      for (const p of alive()) {
+        let mineId = null;
+        for (const o of E.options) if (o.authors.indexOf(p.id) !== -1) { mineId = o.id; break; }
+        send(p.id, {
+          t: "choices", index: E.qIndex + 1, total: E.TOTAL, q: E.cur.q,
+          cat: E.cur.catName, diff: E.diff.name, seconds: CHOOSE_SEC,
+          options: E.options.map((o) => ({ id: o.id, text: o.text })), mineId,
+        });
+      }
     }
 
-    E.endQuestion = () => {
-      if (E.phase !== "question") return;
+    // ---- phase 2: pick the real answer ----
+    E.vote = (id, optId) => {
+      if (E.phase !== "choose") return;
+      const p = E.players.find((x) => x.id === id);
+      if (!p || p.gone || p.vote !== null) return;
+      const opt = E.options.find((o) => o.id === optId);
+      if (!opt || opt.authors.indexOf(id) !== -1) return;   // no picking your own bluff
+      p.vote = optId;
+      send(p.id, { t: "voted", optId });
+      maybeAllVoted();
+    };
+    function maybeAllVoted() {
+      if (E.phase !== "choose") return;
+      if (alive().length && alive().every((p) => p.vote !== null)) E.endRound();
+    }
+    E.forceVote = () => { if (E.phase === "choose") E.endRound(); };
+
+    E.endRound = () => {
+      if (E.phase !== "choose") return;
       E.phase = "reveal";
-      const counts = [0, 0, 0, 0];
-      for (const p of alive()) if (p.choice !== null) counts[p.choice]++;
+      for (const o of E.options) o.pickers = [];
+      for (const p of alive()) if (p.vote !== null) {
+        const o = E.options.find((x) => x.id === p.vote);
+        if (o) o.pickers.push(p.id);
+      }
+      // score: finding the truth, knowing it, and fooling others
       for (const p of alive()) {
-        let pts = 0;
-        if (p.choice === E.cur.c) {
-          const remain = Math.max(0, SEC * 1000 - p.ansMs);
-          pts = 100 + Math.round((remain / (SEC * 1000)) * 100);   // 100..200
+        const voted = p.vote !== null ? E.options.find((o) => o.id === p.vote) : null;
+        if (voted && voted.truth) { p.score += PT_TRUTH; addDelta(p, PT_TRUTH); }
+        if (p.knew) { p.score += PT_KNEW; addDelta(p, PT_KNEW); }
+      }
+      for (const o of E.options) {
+        if (o.truth || !o.pickers.length) continue;
+        for (const aid of o.authors) {
+          const a = E.players.find((x) => x.id === aid);
+          if (a) { a.score += PT_FOOL * o.pickers.length; addDelta(a, PT_FOOL * o.pickers.length); }
         }
-        if (pts) { p.score += pts; E.deltas[p.name] = pts; }
-        send(p.id, { t: "yourResult", correct: p.choice === E.cur.c, answered: p.choice !== null, pts });
       }
       const final = E.qIndex >= E.TOTAL - 1;
       const board = [...alive()].sort((a, b) => b.score - a.score)
         .map((p) => ({ name: p.name, total: p.score, delta: E.deltas[p.name] || 0 }));
-      bcast({ t: "reveal", correct: E.cur.c, counts, board, index: E.qIndex + 1, total: E.TOTAL, final, cat: E.cur.catName, diff: E.diff.name });
+      const optionsOut = E.options.map((o) => ({
+        text: o.text, truth: o.truth,
+        authors: o.authors.map(nameOf), pickers: o.pickers.map(nameOf),
+      }));
+      bcast({
+        t: "reveal", q: E.cur.q, answer: E.cur.answer, cat: E.cur.catName, diff: E.diff.name,
+        options: optionsOut, knew: alive().filter((p) => p.knew).map((p) => p.name),
+        board, index: E.qIndex + 1, total: E.TOTAL, final,
+      });
     };
-
-    E.forceEnd = () => { if (E.phase === "question") E.endQuestion(); };
 
     E.next = () => {
       if (E.phase !== "reveal" || E.qIndex >= E.TOTAL - 1) return;
       E.qIndex++;
-      nextQuestion();
+      nextRound();
     };
-
     E.playAgain = () => {
       if (E.phase !== "reveal" || E.qIndex < E.TOTAL - 1) return;
       E.phase = "lobby";
       E.players = E.players.filter((p) => !p.gone);
-      for (const p of E.players) { p.score = 0; p.choice = null; }
+      for (const p of E.players) p.score = 0;
       sendLobby();
     };
 
@@ -1004,7 +1100,8 @@
         conn.on("data", (msg) => {
           if (!msg || typeof msg !== "object") return;
           if (msg.t === "join") { hostConns[conn.peer] = conn; engine.addPlayer(conn.peer, msg.name); }
-          else if (msg.t === "answer") engine.answer(conn.peer, msg.choice);
+          else if (msg.t === "bluff") engine.submitBluff(conn.peer, msg.text);
+          else if (msg.t === "vote") engine.vote(conn.peer, msg.optId);
         });
         conn.on("close", () => { delete hostConns[conn.peer]; engine.removePlayer(conn.peer); });
       });
@@ -1033,46 +1130,50 @@
   }
 
   const toHost = (msg) => {
-    if (isHost) { if (msg.t === "answer") engine.answer("host", msg.choice); }
-    else if (clientConn) clientConn.send(msg);
+    if (isHost) {
+      if (msg.t === "bluff") engine.submitBluff("host", msg.text);
+      else if (msg.t === "vote") engine.vote("host", msg.optId);
+    } else if (clientConn) clientConn.send(msg);
   };
 
-  /* ---- host authoritative clock ---- */
-  function hostRunQuestionClock() {
-    if (!isHost) return;
-    let left = SEC;
-    hostTurnIv = setInterval(() => {
-      left--;
-      if (left <= 0) { stopHostClock(); engine.endQuestion(); }
+  /* ---- timers ---- */
+  let phaseDur = 1;
+  function startCountdown(seconds) {
+    secondsLeft = seconds; phaseDur = seconds || 1;
+    countdown = setInterval(() => {
+      secondsLeft--;
+      const bar = document.getElementById("tbar");
+      if (bar) bar.style.width = Math.max(0, (secondsLeft / phaseDur) * 100) + "%";
+      const tl = document.getElementById("tleft");
+      if (tl) tl.textContent = secondsLeft + "ث";
+      if (secondsLeft <= 5 && secondsLeft > 0) sTick();
+      if (secondsLeft <= 0) clearInterval(countdown);
     }, 1000);
+  }
+  function hostPhaseClock(seconds, fn) {
+    if (!isHost) return;
+    let left = seconds;
+    hostTurnIv = setInterval(() => { left--; if (left <= 0) { stopHostClock(); fn(); } }, 1000);
   }
 
   /* ---- message handling ---- */
   function handleMsg(msg) {
     if (msg.t === "lobby") { clearTimers(); stopHostClock(); renderLobby(msg); }
-    else if (msg.t === "question") {
-      clearTimers(); stopHostClock();
-      sWhoosh(); buzz(20);
-      cur = { index: msg.index, total: msg.total, q: msg.q, options: msg.options, mine: null, locked: false, cat: msg.cat, diff: msg.diff };
-      secondsLeft = msg.seconds;
-      renderQuestion();
-      countdown = setInterval(() => {
-        secondsLeft--;
-        const bar = document.getElementById("tbar");
-        if (bar) bar.style.width = Math.max(0, (secondsLeft / SEC) * 100) + "%";
-        const tl = document.getElementById("tleft");
-        if (tl) tl.textContent = secondsLeft + "ث";
-        if (secondsLeft <= 5 && secondsLeft > 0) sTick();
-        if (secondsLeft <= 0) clearInterval(countdown);
-      }, 1000);
-      if (isHost) hostRunQuestionClock();
+    else if (msg.t === "write") {
+      clearTimers(); stopHostClock(); sWhoosh(); buzz(20);
+      cur = { phase: "write", index: msg.index, total: msg.total, q: msg.q, cat: msg.cat, diff: msg.diff, wrote: false };
+      renderWrite(); startCountdown(msg.seconds);
+      if (isHost) hostPhaseClock(msg.seconds, () => engine.forceWrite());
     }
-    else if (msg.t === "locked") { if (cur) { cur.mine = msg.choice; cur.locked = true; } sLock(); buzz(15); markLocked(); }
-    else if (msg.t === "yourResult") {
-      if (cur) cur.result = msg;
-      (msg.correct ? sRight : sWrong)();
-      buzz(msg.correct ? [30, 20, 60] : 40);
+    else if (msg.t === "wrote") { if (cur) cur.wrote = true; sLock(); buzz(15); markWrote(); }
+    else if (msg.t === "choices") {
+      clearTimers(); stopHostClock(); sWhoosh(); buzz(15);
+      cur = { phase: "choose", index: msg.index, total: msg.total, q: msg.q, cat: msg.cat, diff: msg.diff,
+              options: msg.options, mineId: msg.mineId, voted: false, myVote: null };
+      renderChoose(); startCountdown(msg.seconds);
+      if (isHost) hostPhaseClock(msg.seconds, () => engine.forceVote());
     }
+    else if (msg.t === "voted") { if (cur) { cur.voted = true; cur.myVote = msg.optId; } sLock(); buzz(15); markVoted(); }
     else if (msg.t === "reveal") {
       clearTimers(); stopHostClock();
       after(0, () => (msg.final ? sChamp : sReveal)());
@@ -1163,60 +1264,94 @@
     `);
   }
 
-  function answerBtns(interactive) {
-    return cur.options.map((opt, i) => {
-      const id = "ans" + i;
-      if (interactive) setTimeout(() => {
+  const roundHead = () => `
+    <div class="turn-head"><span>الجولة ${cur.index}/${cur.total}</span><span id="tleft">…</span></div>
+    ${cur.cat ? `<div class="catline">${esc(cur.cat)} · ${esc(cur.diff)}</div>` : ""}
+    <div class="timebar-wrap"><div class="timebar" id="tbar" style="width:100%"></div></div>`;
+
+  /* ---- phase 1: write a bluff ---- */
+  function renderWrite() {
+    setTimeout(() => {
+      const inp = document.getElementById("bluffIn"), b = document.getElementById("bluffBtn");
+      const go = () => {
+        if (cur.wrote) return;
+        const v = (inp && inp.value || "").trim();
+        if (!v) { if (inp) inp.focus(); return; }
+        ensureAudio(); cur.wrote = true; markWrote(); toHost({ t: "bluff", text: v });
+      };
+      if (b) b.onclick = go;
+      if (inp) { inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } }; inp.focus(); }
+    }, 0);
+    h(roundHead() + `
+      <div class="qtext">${esc(cur.q)}</div>
+      <div class="bluff-hint">💡 اكتب إجابة <b>مزيّفة</b> تبدو صحيحة لتخدع البقية. كل من يقع في فخّك يمنحك نقاطاً!</div>
+      <input id="bluffIn" maxlength="40" placeholder="اكتب فخّك هنا…" autocomplete="off">
+      <button class="btn" id="bluffBtn">أرسل الفخّ 🎭</button>
+      <div class="waiting" id="lockNote"></div>
+      ${isHost ? hostBtn("⏭ إنهاء الكتابة", () => engine.forceWrite(), "ghost") : ""}`);
+  }
+  function markWrote() {
+    const inp = document.getElementById("bluffIn"), b = document.getElementById("bluffBtn");
+    if (inp) inp.disabled = true;
+    if (b) { b.disabled = true; b.textContent = "تم الإرسال ✔️"; }
+    const note = document.getElementById("lockNote");
+    if (note) note.textContent = "أرسلت فخّك — بانتظار البقية…";
+  }
+
+  /* ---- phase 2: pick the real answer ---- */
+  function renderChoose() {
+    const list = cur.options.map((o) => {
+      const own = o.id === cur.mineId;
+      const id = "opt" + o.id;
+      if (!own) setTimeout(() => {
         const el = document.getElementById(id);
         if (el) el.onclick = () => {
-          ensureAudio();
-          if (cur.locked) return;
-          cur.locked = true; cur.mine = i;
-          markLocked();
-          toHost({ t: "answer", choice: i });
+          if (cur.voted) return;
+          ensureAudio(); cur.voted = true; cur.myVote = o.id; markVoted(); toHost({ t: "vote", optId: o.id });
         };
       }, 0);
-      return `<button class="ans a${i}" id="${id}"><span class="shape">${SHAPES[i]}</span><span>${esc(opt)}</span></button>`;
+      return `<button class="opt ${own ? "own" : ""}" id="${id}" ${own ? "disabled" : ""}>${esc(o.text)}${own ? ` <span class="meta">✍️ هذا فخّك</span>` : ""}</button>`;
     }).join("");
-  }
-
-  function markLocked() {
-    for (let i = 0; i < 4; i++) {
-      const el = document.getElementById("ans" + i);
-      if (!el) continue;
-      el.disabled = true;
-      if (i !== cur.mine) el.classList.add("dim");
-    }
-    const note = document.getElementById("lockNote");
-    if (note) note.textContent = "تم تثبيت إجابتك ✔️ — انتظر البقية…";
-  }
-
-  function renderQuestion() {
-    const head = `
-      <div class="turn-head"><span>السؤال ${cur.index}/${cur.total}</span><span id="tleft">${SEC}ث</span></div>
-      ${cur.cat ? `<div class="catline">${esc(cur.cat)} · ${esc(cur.diff)}</div>` : ""}
-      <div class="timebar-wrap"><div class="timebar" id="tbar" style="width:100%"></div></div>`;
-    h(head + `
+    h(roundHead() + `
       <div class="qtext">${esc(cur.q)}</div>
-      <div class="ans-grid">${answerBtns(true)}</div>
+      <div class="bluff-hint">🔍 اختر <b>الإجابة الحقيقية</b> من بين الأفخاخ</div>
+      <div class="opt-list">${list}</div>
       <div class="waiting" id="lockNote"></div>
-      ${isHost ? hostBtn("⏭ إنهاء السؤال", () => engine.endQuestion(), "ghost") : ""}`);
+      ${isHost ? hostBtn("⏭ إنهاء التصويت", () => engine.forceVote(), "ghost") : ""}`);
+  }
+  function markVoted() {
+    cur.options.forEach((o) => {
+      const el = document.getElementById("opt" + o.id);
+      if (el) { el.disabled = true; if (o.id === cur.myVote) el.classList.add("picked"); }
+    });
+    const note = document.getElementById("lockNote");
+    if (note) note.textContent = "تم اختيارك — بانتظار البقية…";
   }
 
+  /* ---- reveal: who fooled whom ---- */
   function renderReveal(msg) {
-    const r = cur && cur.result;
-    let banner = "";
-    if (r) {
-      if (!r.answered) banner = `<div class="result-banner no">⏱️ انتهى الوقت — لم تُجب</div>`;
-      else if (r.correct) banner = `<div class="result-banner ok">✅ إجابة صحيحة! +${r.pts} نقطة</div>`;
-      else banner = `<div class="result-banner no">❌ إجابة خاطئة</div>`;
-    }
-    const ans = cur.options.map((opt, i) => {
-      let cls = "ans a" + i;
-      if (i === msg.correct) cls += " right";
-      else if (cur.mine === i) cls += " wrong";
-      else cls += " dim";
-      return `<div class="${cls}"><span class="shape">${SHAPES[i]}</span><span>${esc(opt)}</span><span class="cnt">${msg.counts[i]}</span></div>`;
+    const me = msg.board.find((b) => b.name === myName) || { delta: 0 };
+    const knewIt = (msg.knew || []).indexOf(myName) !== -1;
+    const foundTruth = msg.options.some((o) => o.truth && o.pickers.indexOf(myName) !== -1);
+    const fooled = msg.options.filter((o) => o.authors.indexOf(myName) !== -1)
+      .reduce((s, o) => s + o.pickers.length, 0);
+    const lines = [];
+    if (knewIt) lines.push("🧠 عرفت الإجابة الصحيحة!");
+    else if (foundTruth) lines.push("✅ وجدت الحقيقة!");
+    else lines.push("❌ لم تجد الحقيقة هذه المرة");
+    if (fooled > 0) lines.push(`🎭 خدعت ${fooled} ${fooled === 1 ? "لاعباً" : "لاعبين"}!`);
+    const ok = knewIt || foundTruth || fooled > 0;
+    const banner = `<div class="result-banner ${ok ? "ok" : "no"}">${lines.join(" • ")}${me.delta ? ` (+${me.delta})` : ""}</div>`;
+
+    const opts = [...msg.options].sort((a, b) => (b.truth ? 1 : 0) - (a.truth ? 1 : 0) || b.pickers.length - a.pickers.length);
+    const optHtml = opts.map((o) => {
+      const who = o.truth
+        ? `<span class="meta">✔️ الإجابة الصحيحة</span>`
+        : `<span class="meta">✍️ فخّ: ${o.authors.map(esc).join("، ") || "—"}</span>`;
+      const picks = o.pickers.length
+        ? `<span class="meta">🎯 اختاره: ${o.pickers.map(esc).join("، ")}</span>`
+        : `<span class="meta">🎯 لم يختره أحد</span>`;
+      return `<div class="opt ${o.truth ? "truth" : "fake"}">${esc(o.text)}${who}${picks}</div>`;
     }).join("");
 
     const max = Math.max(...msg.board.map((b) => b.total), 1);
@@ -1229,16 +1364,17 @@
         <div class="bpts">${b.total}</div>
         <div class="bdelta">${b.delta ? "+" + b.delta : ""}</div>
       </div>`).join("");
-    const champ = msg.final ? `<div class="champ">👑 ${esc(msg.board[0].name)} بطل التحدّي!</div>` : "";
+    const champ = msg.final ? `<div class="champ">👑 ${esc(msg.board[0].name)} بطل المُخادعين!</div>` : "";
     const ctl = isHost
-      ? (msg.final ? hostBtn("العب مجددًا 🔁", () => engine.playAgain()) : hostBtn("السؤال التالي ⏭", () => engine.next()))
+      ? (msg.final ? hostBtn("العب مجددًا 🔁", () => engine.playAgain()) : hostBtn("الجولة التالية ⏭", () => engine.next()))
       : `<div class="waiting pulse">${msg.final ? "يمكن للمضيف بدء جولة جديدة…" : "بانتظار المضيف…"}</div>`;
 
     h(`
-      <div class="turn-head"><span>${msg.final ? "النتائج النهائية" : "السؤال " + msg.index + "/" + msg.total}</span><span>الإجابة الصحيحة</span></div>
+      <div class="turn-head"><span>${msg.final ? "النتائج النهائية" : "الجولة " + msg.index + "/" + msg.total}</span><span>الكشف 🎭</span></div>
       ${msg.cat ? `<div class="catline">${esc(msg.cat)} · ${esc(msg.diff)}</div>` : ""}
+      <div class="qtext" style="font-size:16px;min-height:0;padding:14px">${esc(msg.q)}</div>
       ${banner}
-      <div class="ans-grid">${ans}</div>
+      <div class="opt-list">${optHtml}</div>
       ${champ}
       <div class="box board">${rows}</div>
       ${ctl}
