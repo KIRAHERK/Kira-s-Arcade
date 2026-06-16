@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0c1730">
+<title>تحدّي المعلومات 🧠</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+  body {
+    min-height: 100%;
+    font-family: "Segoe UI", "Noto Naskh Arabic", "Geeza Pro", "Tahoma", system-ui, sans-serif;
+    background: radial-gradient(120% 100% at 50% 0%, #18335c 0%, #0c1730 60%, #060b18 100%);
+    background-attachment: fixed;
+    color: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+  }
+  .logo {
+    font-size: 27px; font-weight: 900; letter-spacing: 1px; margin-top: 2px;
+    background: linear-gradient(180deg, #d8f3ff, #5cc8ff 45%, #4d7dff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 26px rgba(92, 200, 255, .3);
+  }
+  .sub { font-size: 12.5px; opacity: .6; margin: 4px 0 14px; text-align: center; line-height: 1.5; }
+  #app { width: min(96vw, 430px); display: flex; flex-direction: column; gap: 10px; }
+
+  .box {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 18px;
+    padding: 16px;
+  }
+  .box h2 { font-size: 13px; letter-spacing: 1px; opacity: .65; margin-bottom: 12px; font-weight: 700; }
+  input {
+    width: 100%; padding: 13px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.25);
+    background: rgba(0,0,0,.35); color: #fff;
+    font-size: 17px; font-weight: 600; text-align: center;
+    outline: none; margin-bottom: 10px;
+  }
+  input::placeholder { color: rgba(255,255,255,.35); }
+  .btn {
+    width: 100%; padding: 14px; border: none; border-radius: 14px;
+    font-size: 16px; font-weight: 800; letter-spacing: .5px;
+    color: #fff;
+    background: linear-gradient(180deg, #7db8ff, #4d7dff 55%, #2b4fcc);
+    box-shadow: 0 5px 0 #1a3080;
+  }
+  .btn.alt { background: linear-gradient(180deg, #9be8c0, #3ddc84 55%, #1f9c5b); box-shadow: 0 5px 0 #11603a; color: #06250f; }
+  .btn.ghost { background: rgba(255,255,255,.1); box-shadow: none; border: 1px solid rgba(255,255,255,.25); color: #fff; font-size: 13px; padding: 10px; }
+  .btn:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+  .btn:disabled { opacity: .55; }
+  .btn + .btn { margin-top: 10px; }
+
+  .code-big {
+    font-size: 42px; font-weight: 900; letter-spacing: 12px;
+    text-align: center; color: #5cc8ff; direction: ltr;
+    text-shadow: 0 0 22px rgba(92,200,255,.5);
+    margin: 6px 0 2px;
+  }
+  .code-hint { text-align: center; font-size: 12px; opacity: .6; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip {
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 14px; font-weight: 700;
+  }
+  .chip.me { border-color: #5cc8ff; color: #5cc8ff; }
+
+  .turn-head { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 800; opacity: .8; }
+  .timebar-wrap { background: rgba(0,0,0,.4); border-radius: 999px; height: 9px; overflow: hidden; }
+  .timebar { height: 100%; background: linear-gradient(90deg, #3ddc84, #ffd54a); border-radius: 999px; transition: width 1s linear; }
+
+  .qtext {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 16px; padding: 20px 16px;
+    text-align: center; font-size: 20px; font-weight: 800; line-height: 1.5;
+    min-height: 92px; display: flex; align-items: center; justify-content: center;
+  }
+  .ans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ans {
+    border: none; border-radius: 14px; padding: 16px 12px;
+    font-size: 16px; font-weight: 800; color: #fff; text-align: center;
+    min-height: 66px; line-height: 1.35; display: flex; align-items: center; justify-content: center; gap: 7px;
+    box-shadow: 0 4px 0 rgba(0,0,0,.35);
+  }
+  .ans:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+  .ans .shape { font-size: 15px; opacity: .9; }
+  .ans.a0 { background: #e8505b; }
+  .ans.a1 { background: #2d9cdb; }
+  .ans.a2 { background: #f2c037; color: #2a1d00; }
+  .ans.a3 { background: #27ae60; }
+  .ans.dim { opacity: .3; box-shadow: none; }
+  .ans.right { outline: 4px solid #d6ffe6; opacity: 1; box-shadow: 0 0 22px rgba(61,220,132,.6); }
+  .ans.wrong { outline: 4px solid #ffd0d0; }
+  .ans .cnt { font-size: 12px; opacity: .85; font-weight: 800; }
+
+  .result-banner { text-align: center; font-size: 19px; font-weight: 900; padding: 12px; border-radius: 14px; }
+  .result-banner.ok { background: rgba(61,220,132,.14); border: 1px solid #3ddc84; color: #b8ffd4; }
+  .result-banner.no { background: rgba(232,80,91,.14); border: 1px solid #e8505b; color: #ffc4c8; }
+
+  .board { display: flex; flex-direction: column; gap: 8px; }
+  .brow {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px; padding: 10px 12px;
+    position: relative; overflow: hidden;
+  }
+  .brow .bar { position: absolute; right: 0; top: 0; bottom: 0; background: rgba(92,200,255,.12); }
+  .brow .medal { font-size: 19px; width: 28px; text-align: center; z-index: 1; }
+  .brow .bname { flex: 1; font-weight: 800; font-size: 15px; z-index: 1; }
+  .brow .bpts { font-weight: 900; color: #5cc8ff; z-index: 1; }
+  .brow .bdelta { font-size: 12px; color: #3ddc84; font-weight: 800; z-index: 1; width: 46px; text-align: left; }
+  .brow.me { border-color: #5cc8ff; }
+  .champ { text-align: center; font-size: 20px; font-weight: 900; padding: 14px; border-radius: 14px;
+    background: rgba(92,200,255,.12); border: 1px solid #5cc8ff; line-height: 1.5; }
+  .waiting { text-align: center; font-size: 14px; opacity: .7; padding: 8px; }
+  .pulse { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  .links { margin-top: 12px; font-size: 13px; text-align: center; }
+  .links a { color: rgba(255,255,255,.65); text-decoration: underline; }
+  .err { color: #ff8a8a; font-size: 13px; text-align: center; min-height: 18px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="logo">🧠 تحدّي المعلومات</div>
+<div class="sub">أسرع إجابة صحيحة تكسب أكثر نقاط<br>٢–٨ هواتف، ورمز غرفة واحد (٣+ أفضل)</div>
+<div id="app"></div>
+<div class="links"><a href="index.html">🏠 كل الألعاب</a></div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ---- audio ---- */
+  let actx = null;
+  function ensureAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+    if (actx && actx.state === "suspended") actx.resume();
+  }
+  function tone(f1, f2, dur, type, vol, when = 0) {
+    if (!actx) return;
+    const t = actx.currentTime + when;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f1, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(f2, 1), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  const sClick = () => tone(500, 460, 0.05, "square", 0.03);
+  const sWhoosh = () => tone(300, 900, 0.25, "sine", 0.05);
+  const sLock = () => { tone(700, 520, 0.08, "square", 0.04); };
+  const sRight = () => { tone(784, 1047, 0.12, "triangle", 0.06); tone(1047, 1319, 0.16, "triangle", 0.05, 0.1); };
+  const sWrong = () => { tone(300, 160, 0.22, "sawtooth", 0.04); };
+  const sTick = () => tone(1000, 980, 0.04, "square", 0.035);
+  const sReveal = () => [523, 659, 784].forEach((f, i) => tone(f, f, 0.13, "triangle", 0.05, i * 0.09));
+  const sChamp = () => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, f, 0.2, "triangle", 0.06, i * 0.13));
+  const buzz = (p) => { if (navigator.vibrate) navigator.vibrate(p); };
+
+  /* =====================================================
+     QUESTION BANK — Arabic general knowledge
+     each: q = question, a = [4 options], c = index of correct option
+     ===================================================== */
+  const QUESTIONS = [
+    { q: "ما هي عاصمة فرنسا؟", a: ["باريس", "لندن", "روما", "مدريد"], c: 0 },
+    { q: "كم عدد ألوان قوس قزح؟", a: ["سبعة", "خمسة", "ستة", "ثمانية"], c: 0 },
+    { q: "ما أكبر كوكب في المجموعة الشمسية؟", a: ["المشتري", "زحل", "الأرض", "المريخ"], c: 0 },
+    { q: "ما أطول نهر في قارة أفريقيا؟", a: ["النيل", "الكونغو", "النيجر", "زامبيزي"], c: 0 },
+    { q: "كم عدد قارات العالم؟", a: ["سبع", "خمس", "ست", "ثماني"], c: 0 },
+    { q: "ما العنصر الكيميائي الذي رمزه O؟", a: ["الأكسجين", "الذهب", "الحديد", "الكربون"], c: 0 },
+    { q: "من رسم لوحة الموناليزا؟", a: ["ليوناردو دافنشي", "بيكاسو", "فان غوخ", "مايكل أنجلو"], c: 0 },
+    { q: "ما أكبر محيط في العالم؟", a: ["المحيط الهادئ", "الأطلسي", "الهندي", "المتجمد الشمالي"], c: 0 },
+    { q: "كم عدد لاعبي فريق كرة القدم داخل الملعب؟", a: ["أحد عشر", "تسعة", "عشرة", "اثنا عشر"], c: 0 },
+    { q: "ما هي عاصمة اليابان؟", a: ["طوكيو", "بكين", "سيول", "بانكوك"], c: 0 },
+    { q: "ما أسرع حيوان بري في العالم؟", a: ["الفهد", "الأسد", "الحصان", "الغزال"], c: 0 },
+    { q: "كم يوماً في السنة الكبيسة؟", a: ["366", "365", "364", "367"], c: 0 },
+    { q: "ما المعدن الذي يكون سائلاً في درجة حرارة الغرفة؟", a: ["الزئبق", "الحديد", "النحاس", "الرصاص"], c: 0 },
+    { q: "من مؤلف مسرحية روميو وجولييت؟", a: ["شكسبير", "تولستوي", "ديكنز", "همنغواي"], c: 0 },
+    { q: "ما أكبر دولة في العالم من حيث المساحة؟", a: ["روسيا", "كندا", "الصين", "الولايات المتحدة"], c: 0 },
+    { q: "كم عدد الكواكب في المجموعة الشمسية؟", a: ["ثمانية", "تسعة", "سبعة", "عشرة"], c: 0 },
+    { q: "أي كوكب يُلقّب بالكوكب الأحمر؟", a: ["المريخ", "الزهرة", "عطارد", "المشتري"], c: 0 },
+    { q: "ما هي عاصمة مصر؟", a: ["القاهرة", "الإسكندرية", "الجيزة", "أسوان"], c: 0 },
+    { q: "ما أكبر عضو في جسم الإنسان؟", a: ["الجلد", "الكبد", "القلب", "الرئة"], c: 0 },
+    { q: "ما هي عاصمة المملكة العربية السعودية؟", a: ["الرياض", "جدة", "مكة", "الدمام"], c: 0 },
+    { q: "أي حيوان يُلقّب بسفينة الصحراء؟", a: ["الجمل", "الحصان", "الفيل", "الحمار"], c: 0 },
+    { q: "ما الغاز الضروري لتنفس الإنسان؟", a: ["الأكسجين", "ثاني أكسيد الكربون", "النيتروجين", "الهيدروجين"], c: 0 },
+    { q: "في أي قارة تقع مصر؟", a: ["أفريقيا", "آسيا", "أوروبا", "أستراليا"], c: 0 },
+    { q: "ما أكبر حيوان على وجه الأرض؟", a: ["الحوت الأزرق", "الفيل", "الزرافة", "القرش"], c: 0 },
+    { q: "ما عملة اليابان؟", a: ["الين", "اليورو", "الدولار", "الجنيه"], c: 0 },
+    { q: "ما الكوكب الأقرب إلى الشمس؟", a: ["عطارد", "الزهرة", "الأرض", "المريخ"], c: 0 },
+    { q: "من أول إنسان مشى على سطح القمر؟", a: ["نيل أرمسترونغ", "يوري غاغارين", "باز ألدرين", "جون غلين"], c: 0 },
+    { q: "ما أطول سلسلة جبال على اليابسة؟", a: ["جبال الأنديز", "الهيمالايا", "جبال الألب", "جبال الروكي"], c: 0 },
+    { q: "كم عدد أسنان الإنسان البالغ؟", a: ["32", "28", "30", "34"], c: 0 },
+    { q: "ما الطائر الذي لا يطير ويعيش في القطب الجنوبي؟", a: ["البطريق", "النعامة", "الدجاج", "البومة"], c: 0 },
+    { q: "ما أصغر وحدة بنائية في الكائن الحي؟", a: ["الخلية", "الذرة", "النواة", "الجزيء"], c: 0 },
+    { q: "كم عدد قلوب الأخطبوط؟", a: ["ثلاثة", "واحد", "اثنان", "أربعة"], c: 0 },
+    { q: "ما هي عاصمة دولة الإمارات العربية المتحدة؟", a: ["أبو ظبي", "دبي", "الشارقة", "العين"], c: 0 },
+    { q: "ما أكبر حيوان مفترس بري؟", a: ["الدب القطبي", "الأسد", "النمر", "الذئب"], c: 0 },
+    { q: "ما هي عاصمة ألمانيا؟", a: ["برلين", "ميونخ", "فرانكفورت", "هامبورغ"], c: 0 },
+    { q: "كم لتراً في المتر المكعب الواحد؟", a: ["1000", "100", "10", "10000"], c: 0 },
+    { q: "ما هي عاصمة إيطاليا؟", a: ["روما", "ميلانو", "البندقية", "نابولي"], c: 0 },
+    { q: "كم عدد أيام الأسبوع؟", a: ["سبعة", "خمسة", "ستة", "ثمانية"], c: 0 },
+    { q: "ما الكوكب الذي نعيش عليه؟", a: ["الأرض", "المريخ", "الزهرة", "المشتري"], c: 0 },
+    { q: "كم عدد دقائق الساعة الواحدة؟", a: ["60", "100", "30", "90"], c: 0 },
+    { q: "ما هي عاصمة المملكة المتحدة؟", a: ["لندن", "مانشستر", "ليفربول", "غلاسكو"], c: 0 },
+    { q: "ما أقرب نجم إلينا؟", a: ["الشمس", "القمر", "الزهرة", "نجم الشمال"], c: 0 },
+    { q: "ما الحيوان الذي يُنتج العسل؟", a: ["النحل", "النمل", "الذباب", "الفراش"], c: 0 },
+    { q: "ما هي عاصمة العراق؟", a: ["بغداد", "البصرة", "الموصل", "أربيل"], c: 0 },
+    { q: "كم عدد أصابع اليد الواحدة؟", a: ["خمسة", "أربعة", "ستة", "ثلاثة"], c: 0 },
+    { q: "ما المادة التي تكوّن أغلب جسم الإنسان؟", a: ["الماء", "الدهون", "البروتين", "الكالسيوم"], c: 0 },
+    { q: "ما هي عاصمة المغرب؟", a: ["الرباط", "الدار البيضاء", "مراكش", "فاس"], c: 0 },
+    { q: "ما لغة البرمجة الأشهر لصفحات الويب التفاعلية؟", a: ["جافاسكريبت", "بايثون", "لغة سي", "جافا"], c: 0 },
+  ];
+
+  /* =====================================================
+     GAME ENGINE (host-side, transport-agnostic)
+     ===================================================== */
+  const SEC = 20;
+  const PER_GAME = 10;
+
+  function createTriviaEngine(send) {
+    const E = {
+      players: [],        // {id, name, score, gone, choice, ansMs}
+      phase: "lobby",     // lobby | question | reveal | gameEnd
+      qIndex: 0,
+      TOTAL: 0,
+      deck: [],           // [{q, a[], c}] already shuffled (questions + options)
+      cur: null,          // current served question {q, a[], c}
+      qStart: 0,
+      deltas: null,       // {name: pts this question}
+    };
+    const alive = () => E.players.filter((p) => !p.gone);
+    const bcast = (msg) => { for (const p of alive()) send(p.id, msg); };
+    const ri = (n) => Math.floor(Math.random() * n);
+    const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = ri(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+
+    E.addPlayer = (id, name) => {
+      if (E.phase !== "lobby" || E.players.length >= 8) return false;
+      let n = (name || "لاعب").trim().slice(0, 14) || "لاعب";
+      let base = n, k = 2;
+      while (E.players.some((p) => p.name === n)) n = base + " " + k++;
+      E.players.push({ id, name: n, score: 0, gone: false, choice: null, ansMs: 0 });
+      sendLobby();
+      return n;
+    };
+    E.removePlayer = (id) => {
+      const p = E.players.find((x) => x.id === id);
+      if (!p) return;
+      if (E.phase === "lobby") { E.players = E.players.filter((x) => x.id !== id); sendLobby(); return; }
+      p.gone = true;
+      if (E.phase === "question") maybeAllAnswered();
+    };
+    function sendLobby() {
+      if (E.phase !== "lobby") return;
+      bcast({ t: "lobby", players: E.players.map((p) => p.name), canStart: E.players.length >= 2 });
+    }
+    E.sendLobby = sendLobby;
+
+    E.start = () => {
+      if (E.phase !== "lobby" || E.players.length < 2) return false;
+      for (const p of E.players) p.score = 0;
+      // build a shuffled deck with shuffled options
+      const picked = shuffle(QUESTIONS.slice()).slice(0, Math.min(PER_GAME, QUESTIONS.length));
+      E.deck = picked.map((item) => {
+        const opts = item.a.map((text, i) => ({ text, correct: i === item.c }));
+        shuffle(opts);
+        return { q: item.q, a: opts.map((o) => o.text), c: opts.findIndex((o) => o.correct) };
+      });
+      E.TOTAL = E.deck.length;
+      E.qIndex = 0;
+      nextQuestion();
+      return true;
+    };
+
+    function nextQuestion() {
+      E.phase = "question";
+      E.cur = E.deck[E.qIndex];
+      E.deltas = {};
+      for (const p of E.players) { p.choice = null; p.ansMs = 0; }
+      E.qStart = Date.now();
+      bcast({ t: "question", index: E.qIndex + 1, total: E.TOTAL, q: E.cur.q, options: E.cur.a, seconds: SEC });
+    }
+
+    E.answer = (id, choice) => {
+      if (E.phase !== "question") return;
+      const p = E.players.find((x) => x.id === id);
+      if (!p || p.gone || p.choice !== null) return;
+      if (typeof choice !== "number" || choice < 0 || choice > 3) return;
+      p.choice = choice;
+      p.ansMs = Date.now() - E.qStart;
+      send(p.id, { t: "locked", choice });
+      maybeAllAnswered();
+    };
+    function maybeAllAnswered() {
+      if (E.phase !== "question") return;
+      if (alive().length && alive().every((p) => p.choice !== null)) E.endQuestion();
+    }
+
+    E.endQuestion = () => {
+      if (E.phase !== "question") return;
+      E.phase = "reveal";
+      const counts = [0, 0, 0, 0];
+      for (const p of alive()) if (p.choice !== null) counts[p.choice]++;
+      for (const p of alive()) {
+        let pts = 0;
+        if (p.choice === E.cur.c) {
+          const remain = Math.max(0, SEC * 1000 - p.ansMs);
+          pts = 100 + Math.round((remain / (SEC * 1000)) * 100);   // 100..200
+        }
+        if (pts) { p.score += pts; E.deltas[p.name] = pts; }
+        send(p.id, { t: "yourResult", correct: p.choice === E.cur.c, answered: p.choice !== null, pts });
+      }
+      const final = E.qIndex >= E.TOTAL - 1;
+      const board = [...alive()].sort((a, b) => b.score - a.score)
+        .map((p) => ({ name: p.name, total: p.score, delta: E.deltas[p.name] || 0 }));
+      bcast({ t: "reveal", correct: E.cur.c, counts, board, index: E.qIndex + 1, total: E.TOTAL, final });
+    };
+
+    E.forceEnd = () => { if (E.phase === "question") E.endQuestion(); };
+
+    E.next = () => {
+      if (E.phase !== "reveal" || E.qIndex >= E.TOTAL - 1) return;
+      E.qIndex++;
+      nextQuestion();
+    };
+
+    E.playAgain = () => {
+      if (E.phase !== "reveal" || E.qIndex < E.TOTAL - 1) return;
+      E.phase = "lobby";
+      E.players = E.players.filter((p) => !p.gone);
+      for (const p of E.players) { p.score = 0; p.choice = null; }
+      sendLobby();
+    };
+
+    return E;
+  }
+  window.__triviaEngine = createTriviaEngine;
+
+  /* =====================================================
+     CLIENT UI
+     ===================================================== */
+  const app = document.getElementById("app");
+  let peer = null, hostConns = {}, clientConn = null;
+  let isHost = false, myName = "";
+  let engine = null;
+  let timers = [];
+  let cur = null;         // {index, total, q, options, mine, locked}
+  let secondsLeft = 0, countdown = null;
+  let hostTurnIv = null;
+
+  function h(html) { app.innerHTML = html; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; clearInterval(countdown); countdown = null; }
+  function after(ms, fn) { timers.push(setTimeout(fn, ms)); }
+  function stopHostClock() { if (hostTurnIv) { clearInterval(hostTurnIv); hostTurnIv = null; } }
+
+  const SHAPES = ["▲", "◆", "●", "■"];
+  const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  function makeCode() {
+    let c = "";
+    for (let i = 0; i < 4; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return c;
+  }
+  const peerId = (code) => "kira-trivia-" + code.toLowerCase();
+
+  function hostGame(name) {
+    myName = name;
+    isHost = true;
+    showWait("جارٍ تجهيز غرفتك…");
+    const code = makeCode();
+    peer = new Peer(peerId(code));
+    peer.on("open", () => {
+      engine = createTriviaEngine((pid, msg) => {
+        if (pid === "host") handleMsg(msg);
+        else if (hostConns[pid]) try { hostConns[pid].send(msg); } catch (e) {}
+      });
+      engine.code = code;
+      myName = engine.addPlayer("host", name);
+      peer.on("connection", (conn) => {
+        conn.on("data", (msg) => {
+          if (!msg || typeof msg !== "object") return;
+          if (msg.t === "join") { hostConns[conn.peer] = conn; engine.addPlayer(conn.peer, msg.name); }
+          else if (msg.t === "answer") engine.answer(conn.peer, msg.choice);
+        });
+        conn.on("close", () => { delete hostConns[conn.peer]; engine.removePlayer(conn.peer); });
+      });
+      engine.sendLobby();
+    });
+    peer.on("error", (e) => showHome("تعذّر إنشاء الغرفة (" + e.type + "). حاول مجددًا."));
+  }
+
+  function joinGame(code, name) {
+    myName = name;
+    isHost = false;
+    showWait("جارٍ الانضمام إلى الغرفة " + code.toUpperCase() + "…");
+    peer = new Peer();
+    peer.on("open", () => {
+      clientConn = peer.connect(peerId(code), { reliable: true });
+      let opened = false;
+      clientConn.on("open", () => { opened = true; clientConn.send({ t: "join", name }); });
+      clientConn.on("data", (msg) => handleMsg(msg));
+      clientConn.on("close", () => showHome("انقطع الاتصال. أعد الانضمام بالرمز."));
+      setTimeout(() => { if (!opened) showHome("الغرفة غير موجودة — تحقق من الرمز (على المضيف إبقاء شاشته مفتوحة)."); }, 9000);
+    });
+    peer.on("error", (e) => {
+      if (e.type === "peer-unavailable") showHome("الغرفة غير موجودة — تحقق من الرمز (على المضيف إبقاء شاشته مفتوحة).");
+      else showHome("خطأ في الاتصال (" + e.type + ").");
+    });
+  }
+
+  const toHost = (msg) => {
+    if (isHost) { if (msg.t === "answer") engine.answer("host", msg.choice); }
+    else if (clientConn) clientConn.send(msg);
+  };
+
+  /* ---- host authoritative clock ---- */
+  function hostRunQuestionClock() {
+    if (!isHost) return;
+    let left = SEC;
+    hostTurnIv = setInterval(() => {
+      left--;
+      if (left <= 0) { stopHostClock(); engine.endQuestion(); }
+    }, 1000);
+  }
+
+  /* ---- message handling ---- */
+  function handleMsg(msg) {
+    if (msg.t === "lobby") { clearTimers(); stopHostClock(); renderLobby(msg); }
+    else if (msg.t === "question") {
+      clearTimers(); stopHostClock();
+      sWhoosh(); buzz(20);
+      cur = { index: msg.index, total: msg.total, q: msg.q, options: msg.options, mine: null, locked: false };
+      secondsLeft = msg.seconds;
+      renderQuestion();
+      countdown = setInterval(() => {
+        secondsLeft--;
+        const bar = document.getElementById("tbar");
+        if (bar) bar.style.width = Math.max(0, (secondsLeft / SEC) * 100) + "%";
+        const tl = document.getElementById("tleft");
+        if (tl) tl.textContent = secondsLeft + "ث";
+        if (secondsLeft <= 5 && secondsLeft > 0) sTick();
+        if (secondsLeft <= 0) clearInterval(countdown);
+      }, 1000);
+      if (isHost) hostRunQuestionClock();
+    }
+    else if (msg.t === "locked") { if (cur) { cur.mine = msg.choice; cur.locked = true; } sLock(); buzz(15); markLocked(); }
+    else if (msg.t === "yourResult") {
+      if (cur) cur.result = msg;
+      (msg.correct ? sRight : sWrong)();
+      buzz(msg.correct ? [30, 20, 60] : 40);
+    }
+    else if (msg.t === "reveal") {
+      clearTimers(); stopHostClock();
+      after(0, () => (msg.final ? sChamp : sReveal)());
+      buzz(msg.final ? [60, 40, 60, 40, 140] : 30);
+      renderReveal(msg);
+    }
+  }
+
+  function hostBtn(label, fn, extra) {
+    const id = "hb" + Math.random().toString(36).slice(2, 8);
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.onclick = () => { ensureAudio(); sClick(); fn(); };
+    }, 0);
+    return `<button class="btn ${extra || ""}" id="${id}">${label}</button>`;
+  }
+
+  function showHome(err) {
+    clearTimers(); stopHostClock();
+    h(`
+      <div class="box">
+        <h2>اسمك</h2>
+        <input id="nameIn" maxlength="14" placeholder="مثال: كيرا" autocomplete="off">
+        <div class="err">${err ? esc(err) : ""}</div>
+        ${hostBtn("أنشئ غرفة", () => {
+          const n = document.getElementById("nameIn").value.trim();
+          if (!n) return showHome("اكتب اسمك أولاً!");
+          if (typeof Peer === "undefined") return showHome("تعذّر تحميل مكتبة الشبكة — تحقق من الإنترنت.");
+          hostGame(n);
+        })}
+      </div>
+      <div class="box">
+        <h2>أو انضم لغرفة</h2>
+        <input id="codeIn" maxlength="4" placeholder="الرمز" style="letter-spacing:8px;text-transform:uppercase;direction:ltr" autocomplete="off">
+        ${hostBtn("انضمام", () => {
+          const n = document.getElementById("nameIn").value.trim();
+          const c = document.getElementById("codeIn").value.trim();
+          if (!n) return showHome("اكتب اسمك أولاً!");
+          if (c.length !== 4) return showHome("الرمز مكوّن من ٤ أحرف.");
+          if (typeof Peer === "undefined") return showHome("تعذّر تحميل مكتبة الشبكة — تحقق من الإنترنت.");
+          joinGame(c, n);
+        }, "alt")}
+      </div>
+    `);
+  }
+  function showWait(text) { h(`<div class="box waiting pulse">${esc(text)}</div>`); }
+
+  function renderLobby(msg) {
+    h(`
+      ${isHost ? `<div class="box" style="text-align:center">
+        <h2>رمز الغرفة — أخبر أصدقاءك</h2>
+        <div class="code-big">${engine.code}</div>
+        <div class="code-hint">يفتحون هذه الصفحة ← انضمام ← يكتبون الرمز<br>أبقِ هذه الشاشة مفتوحة أثناء انضمامهم</div>
+      </div>` : ""}
+      <div class="box">
+        <h2>المتسابقون (${msg.players.length}/8)</h2>
+        <div class="chips">${msg.players.map((p) => `<span class="chip ${p === myName ? "me" : ""}">${esc(p)}</span>`).join("")}</div>
+      </div>
+      ${isHost
+        ? (msg.canStart ? hostBtn("ابدأ التحدّي 🧠", () => engine.start()) : `<div class="waiting pulse">نحتاج متسابقَين على الأقل…</div>`)
+        : `<div class="waiting pulse">بانتظار أن يبدأ المضيف…</div>`}
+    `);
+  }
+
+  function answerBtns(interactive) {
+    return cur.options.map((opt, i) => {
+      const id = "ans" + i;
+      if (interactive) setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.onclick = () => {
+          ensureAudio();
+          if (cur.locked) return;
+          cur.locked = true; cur.mine = i;
+          markLocked();
+          toHost({ t: "answer", choice: i });
+        };
+      }, 0);
+      return `<button class="ans a${i}" id="${id}"><span class="shape">${SHAPES[i]}</span><span>${esc(opt)}</span></button>`;
+    }).join("");
+  }
+
+  function markLocked() {
+    for (let i = 0; i < 4; i++) {
+      const el = document.getElementById("ans" + i);
+      if (!el) continue;
+      el.disabled = true;
+      if (i !== cur.mine) el.classList.add("dim");
+    }
+    const note = document.getElementById("lockNote");
+    if (note) note.textContent = "تم تثبيت إجابتك ✔️ — انتظر البقية…";
+  }
+
+  function renderQuestion() {
+    const head = `
+      <div class="turn-head"><span>السؤال ${cur.index}/${cur.total}</span><span id="tleft">${SEC}ث</span></div>
+      <div class="timebar-wrap"><div class="timebar" id="tbar" style="width:100%"></div></div>`;
+    h(head + `
+      <div class="qtext">${esc(cur.q)}</div>
+      <div class="ans-grid">${answerBtns(true)}</div>
+      <div class="waiting" id="lockNote"></div>
+      ${isHost ? hostBtn("⏭ إنهاء السؤال", () => engine.endQuestion(), "ghost") : ""}`);
+  }
+
+  function renderReveal(msg) {
+    const r = cur && cur.result;
+    let banner = "";
+    if (r) {
+      if (!r.answered) banner = `<div class="result-banner no">⏱️ انتهى الوقت — لم تُجب</div>`;
+      else if (r.correct) banner = `<div class="result-banner ok">✅ إجابة صحيحة! +${r.pts} نقطة</div>`;
+      else banner = `<div class="result-banner no">❌ إجابة خاطئة</div>`;
+    }
+    const ans = cur.options.map((opt, i) => {
+      let cls = "ans a" + i;
+      if (i === msg.correct) cls += " right";
+      else if (cur.mine === i) cls += " wrong";
+      else cls += " dim";
+      return `<div class="${cls}"><span class="shape">${SHAPES[i]}</span><span>${esc(opt)}</span><span class="cnt">${msg.counts[i]}</span></div>`;
+    }).join("");
+
+    const max = Math.max(...msg.board.map((b) => b.total), 1);
+    const medals = ["🥇", "🥈", "🥉"];
+    const rows = msg.board.map((b, i) => `
+      <div class="brow ${b.name === myName ? "me" : ""}">
+        <div class="bar" style="width:${(b.total / max) * 100}%"></div>
+        <div class="medal">${medals[i] || (i + 1)}</div>
+        <div class="bname">${esc(b.name)}</div>
+        <div class="bpts">${b.total}</div>
+        <div class="bdelta">${b.delta ? "+" + b.delta : ""}</div>
+      </div>`).join("");
+    const champ = msg.final ? `<div class="champ">👑 ${esc(msg.board[0].name)} بطل التحدّي!</div>` : "";
+    const ctl = isHost
+      ? (msg.final ? hostBtn("العب مجددًا 🔁", () => engine.playAgain()) : hostBtn("السؤال التالي ⏭", () => engine.next()))
+      : `<div class="waiting pulse">${msg.final ? "يمكن للمضيف بدء جولة جديدة…" : "بانتظار المضيف…"}</div>`;
+
+    h(`
+      <div class="turn-head"><span>${msg.final ? "النتائج النهائية" : "السؤال " + msg.index + "/" + msg.total}</span><span>الإجابة الصحيحة</span></div>
+      ${banner}
+      <div class="ans-grid">${ans}</div>
+      ${champ}
+      <div class="box board">${rows}</div>
+      ${ctl}
+    `);
+  }
+
+  showHome();
+})();
+</script>
+</body>
+</html>
