@@ -864,6 +864,32 @@
       .replace(/\s+/g, " ");
   }
 
+  // convert Arabic-Indic (٠-٩) and Persian (۰-۹) digits to ASCII
+  function toAsciiDigits(s) {
+    return String(s)
+      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
+  }
+  // spelled-out Arabic numbers used as answers -> digit (keys are normalized, no leading ال strip)
+  const NUMWORDS = {
+    "صفر":"0","واحد":"1","واحده":"1","احد":"1","اثنان":"2","اثنتان":"2","اثنين":"2","ثنتان":"2",
+    "ثلاثه":"3","ثلاث":"3","اربعه":"4","اربع":"4","خمسه":"5","خمس":"5","سته":"6","ست":"6",
+    "سبعه":"7","سبع":"7","ثمانيه":"8","ثماني":"8","ثمان":"8","تسعه":"9","تسع":"9","عشره":"10","عشر":"10",
+    "احد عشر":"11","اثنا عشر":"12","اثنتا عشره":"12","عشرون":"20","عشرين":"20","ثلاثون":"30","ثلاثين":"30",
+    "اربعون":"40","خمسون":"50","سبعون":"70","مئه":"100","مايه":"100","الف":"1000","مليون":"1000000","مليار":"1000000000",
+  };
+  function numWordNorm(s) {
+    return toAsciiDigits(String(s)).trim().toLowerCase()
+      .replace(/[ً-ْٰـ]/g, "").replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ");
+  }
+  // returns the digit string if `s` is numeric (digits or a known Arabic number word), else null
+  function numericValue(s) {
+    const t = toAsciiDigits(String(s)).trim();
+    if (/^\d+(\.\d+)?$/.test(t)) return t;
+    const w = numWordNorm(s);
+    return NUMWORDS[w] !== undefined ? NUMWORDS[w] : null;
+  }
+
   function createTriviaEngine(send) {
     const E = {
       players: [],        // {id,name,score,gone, bluff, bluffNorm, vote, knew}
@@ -914,13 +940,24 @@
       if (!ids.length) ids = [CATS[0].id];
       E.cats = ids; E.diff = diff;
       for (const p of E.players) p.score = 0;
-      // pool questions from every chosen category; the real answer is option a[c]
+      // pool questions from every chosen category (keep distractors as decoy fakes)
       let pool = [];
       for (const id of ids) {
         const cname = (CATS.find((c) => c.id === id) || {}).name || "";
-        for (const item of (BANK[id][diff.id] || [])) pool.push({ q: item.q, answer: item.a[item.c], catName: cname });
+        for (const item of (BANK[id][diff.id] || [])) pool.push({ q: item.q, a: item.a, c: item.c, catName: cname });
       }
-      E.deck = shuffle(pool).slice(0, Math.min(ROUNDS, pool.length));
+      E.deck = shuffle(pool).slice(0, Math.min(ROUNDS, pool.length)).map((item) => {
+        const truth = item.a[item.c];
+        const distract = item.a.filter((_, i) => i !== item.c);
+        const v = numericValue(truth);
+        if (v !== null) {   // numeric question: digits everywhere + (رقم) marker
+          return {
+            q: item.q + " (رقم)", answer: v, num: true, catName: item.catName,
+            fakes: distract.map((x) => { const nv = numericValue(x); return nv !== null ? nv : x; }),
+          };
+        }
+        return { q: item.q, answer: truth, num: false, catName: item.catName, fakes: distract };
+      });
       E.TOTAL = E.deck.length;
       E.qIndex = 0;
       nextRound();
@@ -937,7 +974,7 @@
       E.phase = "write";
       E.cur = E.deck[E.qIndex];
       resetRound();
-      bcast({ t: "write", index: E.qIndex + 1, total: E.TOTAL, q: E.cur.q, cat: E.cur.catName, diff: E.diff.name, seconds: WRITE_SEC });
+      bcast({ t: "write", index: E.qIndex + 1, total: E.TOTAL, q: E.cur.q, num: !!E.cur.num, cat: E.cur.catName, diff: E.diff.name, seconds: WRITE_SEC });
     }
 
     // ---- phase 1: write a bluff ----
@@ -945,8 +982,10 @@
       if (E.phase !== "write") return;
       const p = E.players.find((x) => x.id === id);
       if (!p || p.gone || p.bluff !== null) return;
-      const t = String(text || "").trim().slice(0, 40);
+      const t = toAsciiDigits(String(text || "")).trim().slice(0, 40);   // Arabic digits -> ASCII
       if (!t) return;
+      if (E.cur.num && !/^\d+(\.\d+)?$/.test(t)) { send(p.id, { t: "rebluff", reason: "num" }); return; }
+      if (normAns(t) === normAns(E.cur.answer)) { send(p.id, { t: "rebluff", reason: "truth" }); return; }
       p.bluff = t;
       p.bluffNorm = normAns(t);
       send(p.id, { t: "wrote" });
@@ -966,12 +1005,18 @@
       const map = new Map();
       map.set(realNorm, { text: E.cur.answer, truth: true, authors: [] });
       for (const p of alive()) {
-        if (p.bluff === null) continue;
-        if (p.bluffNorm === realNorm) { p.knew = true; continue; }   // they typed the truth
+        if (p.bluff === null || p.bluffNorm === realNorm) continue;
         const e = map.get(p.bluffNorm);
-        if (e && !e.truth) e.authors.push(p.id);
+        if (e && !e.truth) e.authors.push(p.id);   // same bluff from several players -> one option
         else if (!e) map.set(p.bluffNorm, { text: p.bluff, truth: false, authors: [p.id] });
-        else p.knew = true;   // collided with truth norm
+      }
+      // with 5 players or fewer, top up to 5 options with game-written decoys (none if more than 5)
+      if (alive().length <= 5) {
+        for (const f of (E.cur.fakes || [])) {
+          if (map.size >= 5) break;
+          const fn = normAns(f);
+          if (!map.has(fn)) map.set(fn, { text: f, truth: false, authors: [] });
+        }
       }
       E.options = shuffle([...map.values()]);
       E.options.forEach((o, i) => { o.id = i; o.pickers = []; });
@@ -1015,7 +1060,6 @@
       for (const p of alive()) {
         const voted = p.vote !== null ? E.options.find((o) => o.id === p.vote) : null;
         if (voted && voted.truth) { p.score += PT_TRUTH; addDelta(p, PT_TRUTH); }
-        if (p.knew) { p.score += PT_KNEW; addDelta(p, PT_KNEW); }
       }
       for (const o of E.options) {
         if (o.truth || !o.pickers.length) continue;
@@ -1033,8 +1077,7 @@
       }));
       bcast({
         t: "reveal", q: E.cur.q, answer: E.cur.answer, cat: E.cur.catName, diff: E.diff.name,
-        options: optionsOut, knew: alive().filter((p) => p.knew).map((p) => p.name),
-        board, index: E.qIndex + 1, total: E.TOTAL, final,
+        options: optionsOut, board, index: E.qIndex + 1, total: E.TOTAL, final,
       });
     };
 
@@ -1161,11 +1204,12 @@
     if (msg.t === "lobby") { clearTimers(); stopHostClock(); renderLobby(msg); }
     else if (msg.t === "write") {
       clearTimers(); stopHostClock(); sWhoosh(); buzz(20);
-      cur = { phase: "write", index: msg.index, total: msg.total, q: msg.q, cat: msg.cat, diff: msg.diff, wrote: false };
+      cur = { phase: "write", index: msg.index, total: msg.total, q: msg.q, num: !!msg.num, cat: msg.cat, diff: msg.diff, wrote: false, pending: false };
       renderWrite(); startCountdown(msg.seconds);
       if (isHost) hostPhaseClock(msg.seconds, () => engine.forceWrite());
     }
-    else if (msg.t === "wrote") { if (cur) cur.wrote = true; sLock(); buzz(15); markWrote(); }
+    else if (msg.t === "wrote") { if (cur) { cur.wrote = true; cur.pending = false; } sLock(); buzz(15); markWrote(); }
+    else if (msg.t === "rebluff") { if (cur) cur.pending = false; sWrong(); buzz(40); reopenBluff(msg.reason); }
     else if (msg.t === "choices") {
       clearTimers(); stopHostClock(); sWhoosh(); buzz(15);
       cur = { phase: "choose", index: msg.index, total: msg.total, q: msg.q, cat: msg.cat, diff: msg.diff,
@@ -1270,22 +1314,31 @@
     <div class="timebar-wrap"><div class="timebar" id="tbar" style="width:100%"></div></div>`;
 
   /* ---- phase 1: write a bluff ---- */
+  function bluffGo() {
+    if (cur.wrote || cur.pending) return;
+    const inp = document.getElementById("bluffIn");
+    let v = (inp && inp.value || "").trim();
+    if (!v) { if (inp) inp.focus(); return; }
+    if (cur.num) { v = toAsciiDigits(v); if (!/^\d+(\.\d+)?$/.test(v)) { reopenBluff("num"); return; } if (inp) inp.value = v; }
+    ensureAudio(); cur.pending = true;
+    const b = document.getElementById("bluffBtn");
+    if (inp) inp.disabled = true;
+    if (b) { b.disabled = true; b.textContent = "جارٍ الإرسال…"; }
+    const note = document.getElementById("lockNote"); if (note) { note.textContent = ""; note.className = "waiting"; }
+    toHost({ t: "bluff", text: v });
+  }
   function renderWrite() {
     setTimeout(() => {
       const inp = document.getElementById("bluffIn"), b = document.getElementById("bluffBtn");
-      const go = () => {
-        if (cur.wrote) return;
-        const v = (inp && inp.value || "").trim();
-        if (!v) { if (inp) inp.focus(); return; }
-        ensureAudio(); cur.wrote = true; markWrote(); toHost({ t: "bluff", text: v });
-      };
-      if (b) b.onclick = go;
-      if (inp) { inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } }; inp.focus(); }
+      if (b) b.onclick = bluffGo;
+      if (inp) { inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); bluffGo(); } }; inp.focus(); }
     }, 0);
+    const numHint = cur.num ? `<div class="bluff-hint">🔢 هذا سؤال رقمي — اكتب <b>رقماً</b> فقط (يُحوّل ٥ إلى 5 تلقائياً).</div>` : "";
     h(roundHead() + `
       <div class="qtext">${esc(cur.q)}</div>
       <div class="bluff-hint">💡 اكتب إجابة <b>مزيّفة</b> تبدو صحيحة لتخدع البقية. كل من يقع في فخّك يمنحك نقاطاً!</div>
-      <input id="bluffIn" maxlength="40" placeholder="اكتب فخّك هنا…" autocomplete="off">
+      ${numHint}
+      <input id="bluffIn" maxlength="40" placeholder="${cur.num ? "اكتب رقماً…" : "اكتب فخّك هنا…"}" autocomplete="off"${cur.num ? ' inputmode="numeric"' : ""}>
       <button class="btn" id="bluffBtn">أرسل الفخّ 🎭</button>
       <div class="waiting" id="lockNote"></div>
       ${isHost ? hostBtn("⏭ إنهاء الكتابة", () => engine.forceWrite(), "ghost") : ""}`);
@@ -1295,7 +1348,19 @@
     if (inp) inp.disabled = true;
     if (b) { b.disabled = true; b.textContent = "تم الإرسال ✔️"; }
     const note = document.getElementById("lockNote");
-    if (note) note.textContent = "أرسلت فخّك — بانتظار البقية…";
+    if (note) { note.className = "waiting"; note.textContent = "أرسلت فخّك — بانتظار البقية…"; }
+  }
+  function reopenBluff(reason) {
+    const inp = document.getElementById("bluffIn"), b = document.getElementById("bluffBtn");
+    if (inp) { inp.disabled = false; inp.focus(); }
+    if (b) { b.disabled = false; b.textContent = "أرسل الفخّ 🎭"; }
+    const note = document.getElementById("lockNote");
+    if (note) {
+      note.className = "err";
+      note.textContent = reason === "truth"
+        ? "✋ هذه هي الإجابة الصحيحة! اكتب فخّاً مختلفاً."
+        : "✋ اكتب رقماً فقط.";
+    }
   }
 
   /* ---- phase 2: pick the real answer ---- */
@@ -1331,13 +1396,11 @@
   /* ---- reveal: who fooled whom ---- */
   function renderReveal(msg) {
     const me = msg.board.find((b) => b.name === myName) || { delta: 0 };
-    const knewIt = (msg.knew || []).indexOf(myName) !== -1;
     const foundTruth = msg.options.some((o) => o.truth && o.pickers.indexOf(myName) !== -1);
     const fooled = msg.options.filter((o) => o.authors.indexOf(myName) !== -1)
       .reduce((s, o) => s + o.pickers.length, 0);
     const lines = [];
-    if (knewIt) lines.push("🧠 عرفت الإجابة الصحيحة!");
-    else if (foundTruth) lines.push("✅ وجدت الحقيقة!");
+    if (foundTruth) lines.push("✅ وجدت الحقيقة!");
     else lines.push("❌ لم تجد الحقيقة هذه المرة");
     if (fooled > 0) lines.push(`🎭 خدعت ${fooled} ${fooled === 1 ? "لاعباً" : "لاعبين"}!`);
     const ok = knewIt || foundTruth || fooled > 0;
@@ -1347,7 +1410,9 @@
     const optHtml = opts.map((o) => {
       const who = o.truth
         ? `<span class="meta">✔️ الإجابة الصحيحة</span>`
-        : `<span class="meta">✍️ فخّ: ${o.authors.map(esc).join("، ") || "—"}</span>`;
+        : (o.authors.length
+            ? `<span class="meta">✍️ فخّ: ${o.authors.map(esc).join("، ")}</span>`
+            : `<span class="meta">🤖 فخّ من اللعبة</span>`);
       const picks = o.pickers.length
         ? `<span class="meta">🎯 اختاره: ${o.pickers.map(esc).join("، ")}</span>`
         : `<span class="meta">🎯 لم يختره أحد</span>`;
