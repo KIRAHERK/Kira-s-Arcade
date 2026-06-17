@@ -850,7 +850,6 @@
   const ROUNDS = 8;       // questions per game
   const PT_TRUTH = 1000;  // you found the real answer
   const PT_FOOL = 500;    // per player your bluff fooled
-  const PT_KNEW = 1000;   // your bluff WAS the real answer (you knew it)
 
   // forgiving Arabic-aware normalizer for matching bluffs to the truth / each other
   function normAns(s) {
@@ -892,7 +891,7 @@
 
   function createTriviaEngine(send) {
     const E = {
-      players: [],        // {id,name,score,gone, bluff, bluffNorm, vote, knew}
+      players: [],        // {id,name,score,gone, bluff, bluffNorm, vote}
       phase: "lobby",     // lobby | write | choose | reveal | gameEnd
       cats: [],
       diff: null,
@@ -915,7 +914,7 @@
       let n = (name || "لاعب").trim().slice(0, 14) || "لاعب";
       let base = n, k = 2;
       while (E.players.some((p) => p.name === n)) n = base + " " + k++;
-      E.players.push({ id, name: n, score: 0, gone: false, bluff: null, bluffNorm: null, vote: null, knew: false });
+      E.players.push({ id, name: n, score: 0, gone: false, bluff: null, bluffNorm: null, vote: null });
       sendLobby();
       return n;
     };
@@ -965,7 +964,7 @@
     };
 
     function resetRound() {
-      for (const p of E.players) { p.bluff = null; p.bluffNorm = null; p.vote = null; p.knew = false; }
+      for (const p of E.players) { p.bluff = null; p.bluffNorm = null; p.vote = null; }
       E.options = [];
       E.deltas = {};
     }
@@ -1403,7 +1402,7 @@
     if (foundTruth) lines.push("✅ وجدت الحقيقة!");
     else lines.push("❌ لم تجد الحقيقة هذه المرة");
     if (fooled > 0) lines.push(`🎭 خدعت ${fooled} ${fooled === 1 ? "لاعباً" : "لاعبين"}!`);
-    const ok = knewIt || foundTruth || fooled > 0;
+    const ok = foundTruth || fooled > 0;
     const banner = `<div class="result-banner ${ok ? "ok" : "no"}">${lines.join(" • ")}${me.delta ? ` (+${me.delta})` : ""}</div>`;
 
     const opts = [...msg.options].sort((a, b) => (b.truth ? 1 : 0) - (a.truth ? 1 : 0) || b.pickers.length - a.pickers.length);
