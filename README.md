@@ -1,39 +1,64 @@
-# 🎰 Lucky Spin
+# 🕹️ Kira's Arcade
 
-A fun, mobile-first slot machine game — virtual coins only, no real money involved.
+A collection of mobile-first browser games: four party games you play together on your phones, and six arcade games for playing solo. Every game is a single self-contained HTML file. There's no build step and nothing to install.
 
 ## Play it
 
-Open `index.html` in any browser (it's a single self-contained file, no build step or
-dependencies), or serve it locally:
+Open `index.html` in a browser to get the arcade hub, which links to every game. To serve it locally:
 
 ```bash
 python3 -m http.server 8000
-# then visit http://localhost:8000
 ```
 
-For the best experience, open it on your phone and add it to your home screen.
+Then visit <http://localhost:8000>. The games are made for phones: open the hub on your phone and add it to your home screen.
 
-## Features
+## 🎉 Party games
 
-- 🎡 **3-reel slot machine** with smooth, staggered spin animations
-- 🪙 **Virtual coin economy** — start with 1,000 coins, balance saved between sessions
-- 💰 **Adjustable bets** — 10 / 25 / 50 / 100 / 250 coins per spin
-- 🃏 **Double-or-nothing Hi-Lo** — after any win, gamble it on a card guess up to 5 times
-- 💥 **Jackpot** — triple 7s pays 100× your bet with a coin-rain celebration
-- 🔊 **Sound effects** generated with WebAudio (no asset files)
-- 📳 **Haptic feedback** on supported phones
-- 🎁 **Free top-up** when you go broke, so the fun never stops
+Play these with friends in the same room. One phone hosts a game and gets a room code, and everyone else joins by typing that code on their own phone.
 
-## Paytable
+| Game | Players | What it is |
+|---|---|---|
+| 🕵️ **Mafia** (`mafia.html`) | 4–12 | Secret roles, night kills and lying to your friends. |
+| ⚡ **Reflex Royale** (`reflex.html`) | 2–8 | 8 quick mini-rounds with a live leaderboard. The fastest fingers win. |
+| 🎨 **Sketch & Guess** (`sketch.html`) | 2–8 | One player draws live and everyone races to guess the word. Available in English and Arabic. |
+| 🎭 **Al-Fakh (الفخّ)** (`trivia.html`) | 3–8 | Bluffing trivia in Arabic. Write fake answers to fool your friends, then try to spot the real one. |
 
-| Combo | Payout |
+## 🕹️ Arcade games
+
+Solo games. Each run adds coins to your wallet, and your best scores are saved on your device.
+
+| Game | What it is |
 |---|---|
-| 7️⃣ 7️⃣ 7️⃣ | ×100 |
-| 💎 💎 💎 | ×40 |
-| ⭐ ⭐ ⭐ | ×25 |
-| 🔔 🔔 🔔 | ×15 |
-| 🍀 🍀 🍀 | ×10 |
-| 🍋 🍋 🍋 | ×8 |
-| 🍒 🍒 🍒 | ×6 |
-| 🍒 🍒 any | ×2 |
+| 🍬 **Candy Smash** (`candy.html`) | Match-3 with striped candies and color bombs. |
+| 🏗️ **Sky Stack** (`stack.html`) | One-tap tower stacking. Chase PERFECT drops. |
+| 🐦 **Glow Bird** (`bird.html`) | Flap through neon gates. |
+| ⚡ **2048** (`2048.html`) | Swipe and merge tiles to reach 2048. |
+| 🐍 **Neon Snake** (`snake.html`) | Eat orbs and grow long without biting yourself. |
+| 🧱 **Brick Blast** (`breaker.html`) | Breakout: smash every brick and catch the falling perks. |
+
+## How it works
+
+- **Single-file games:** each game's HTML, CSS and JavaScript live in one `.html` file. Sound effects and music are generated with the Web Audio API, so there are no asset files.
+- **Multiplayer:** the party games connect phones directly to each other over WebRTC using [PeerJS](https://peerjs.com/), loaded from a CDN. The host's phone runs the game, and there's no game server.
+- **Saved progress:** coins and high scores are stored in the browser's `localStorage`. Nothing leaves your device.
+
+## Deployment
+
+`.github/workflows/pages.yml` publishes the repository root to GitHub Pages. The workflow runs on every push to the `claude/mobile-gambling-game-ka501a` branch, and you can also start it by hand from the Actions tab.
+
+## Project structure
+
+```
+index.html        Arcade hub: lists every game and shows your coin wallet
+mafia.html        Party: Mafia
+reflex.html       Party: Reflex Royale
+sketch.html       Party: Sketch & Guess
+trivia.html       Party: Al-Fakh (الفخّ)
+candy.html        Arcade: Candy Smash
+stack.html        Arcade: Sky Stack
+bird.html         Arcade: Glow Bird
+2048.html         Arcade: 2048
+snake.html        Arcade: Neon Snake
+breaker.html      Arcade: Brick Blast
+.github/workflows/pages.yml   GitHub Pages deployment
+```
