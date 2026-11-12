@@ -44,7 +44,9 @@ Solo games. Each run adds coins to your wallet, and your best scores are saved o
 
 ## Deployment
 
-`.github/workflows/pages.yml` publishes the repository root to GitHub Pages. The workflow runs on every push to the `claude/mobile-gambling-game-ka501a` branch, and you can also start it by hand from the Actions tab.
+GitHub Pages serves the live site from the `gh-pages` branch. To publish a change, merge it into the `claude/mobile-gambling-game-ka501a` branch and then into `gh-pages`. Pages rebuilds the site a minute or so after each push to `gh-pages`.
+
+The workflow in `.github/workflows/pages.yml` isn't what publishes the site, and its runs fail.
 
 ## Project structure
 
@@ -60,5 +62,5 @@ bird.html         Arcade: Glow Bird
 2048.html         Arcade: 2048
 snake.html        Arcade: Neon Snake
 breaker.html      Arcade: Brick Blast
-.github/workflows/pages.yml   GitHub Pages deployment
+.github/workflows/pages.yml   Unused Pages workflow (the site is served from gh-pages)
 ```
